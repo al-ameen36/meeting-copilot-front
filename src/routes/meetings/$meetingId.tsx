@@ -1,8 +1,10 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeft, Clock, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Clock, CalendarDays, MessageSquare } from 'lucide-react'
 import { supabase } from '#/lib/supabase'
+import { useState } from 'react'
 
 import { InsightCard } from '#/components/InsightCard'
+import { ChatPanel } from '#/components/ChatPanel'
 import type { Insight, Meeting, Segment } from '#/types/transcripts'
 import { formatTime } from '#/lib/utils'
 
@@ -54,6 +56,7 @@ export const Route = createFileRoute('/meetings/$meetingId')({
 
 function MeetingDetail() {
   const { meeting, insights, segments } = Route.useLoaderData()
+  const [isChatOpen, setIsChatOpen] = useState(false)
 
   const importantInsights = insights.filter(
     (i) =>
@@ -99,6 +102,14 @@ function MeetingDetail() {
                 </div>
               </div>
             </div>
+            
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors text-sm font-medium w-full sm:w-auto flex-shrink-0 mt-4 sm:mt-0"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chat with Meeting
+            </button>
           </div>
         </div>
 
@@ -177,6 +188,12 @@ function MeetingDetail() {
           </div>
         </div>
       </div>
+      
+      <ChatPanel 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+        meetingId={meeting.id} 
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useEffect, useState, useMemo } from 'react'
-import { LogOut, History } from 'lucide-react'
+import { LogOut, History, MessageSquare } from 'lucide-react'
 
 import { useWhisperStream } from '#/hooks/use-stream'
 import { supabase } from '#/lib/supabase'
@@ -11,6 +11,7 @@ import { TranscriptDisplay } from '#/components/TranscriptDisplay'
 import { InsightCard } from '#/components/InsightCard'
 import { SourceSelector } from '#/components/SourceSelector'
 import { StartButton } from '#/components/StartButton'
+import { ChatPanel } from '#/components/ChatPanel'
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -26,7 +27,7 @@ type FilterType =
 
 function Home() {
   const navigate = useNavigate()
-  const { active, segments, liveText, insights, start, stop } =
+  const { active, segments, liveText, insights, start, stop, meetingId } =
     useWhisperStream()
 
   const { user, isLoading } = useAuth()
@@ -35,6 +36,7 @@ function Home() {
   const [source, setSource] = useState<'mic' | 'tab'>('mic')
   const [disableRecBtn, setDisableRecBtn] = useState(false)
   const [filter, setFilter] = useState<FilterType>('all')
+  const [isChatOpen, setIsChatOpen] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -123,6 +125,17 @@ function Home() {
             </div>
 
             <div className="flex items-center gap-2">
+              {meetingId && (
+                <button
+                  onClick={() => setIsChatOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors text-sm font-medium"
+                  title="Chat with Meeting"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">Chat</span>
+                </button>
+              )}
+
               <Link
                 to="/meetings"
                 className="p-2 ml-2 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-md transition-all duration-200"
@@ -192,6 +205,14 @@ function Home() {
           )}
         </div>
       </div>
+      
+      {meetingId && (
+        <ChatPanel 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)} 
+          meetingId={meetingId} 
+        />
+      )}
     </div>
   )
 }

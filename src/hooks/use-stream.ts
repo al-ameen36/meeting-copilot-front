@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useAuth } from '#/contexts/AuthContext'
+import { supabase } from '#/lib/supabase'
 import type { Insight } from '#/types/transcripts'
 
 type AudioSource = 'mic' | 'tab'
@@ -36,6 +37,7 @@ export function useWhisperStream() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const [liveText, setLiveText] = useState('')
+  const [meetingId, setMeetingId] = useState<string | null>(null)
 
   const socketRef = useRef<WebSocket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -150,6 +152,7 @@ export function useWhisperStream() {
       setSegments([])
       setLiveText('')
       setInsights([])
+      setMeetingId(null)
       setSource(selectedSource)
 
       const socket = new WebSocket(import.meta.env.VITE_WHISPER_SERVER_URL)
@@ -230,6 +233,19 @@ export function useWhisperStream() {
         try {
           const data = JSON.parse(event.data as string)
           if (data.message === 'auth_ok') {
+            // The backend creates a new meeting row just before sending auth_ok.
+            // Since we can't change the backend payload, we query the latest meeting.
+            const { data: latestMeeting } = await supabase
+              .from('meetings')
+              .select('id')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+
+            if (latestMeeting) {
+              setMeetingId(latestMeeting.id)
+            }
+
             await beginAudio()
             return
           }
@@ -251,6 +267,9 @@ export function useWhisperStream() {
           if (data.message === 'AddTranscript') {
             const startTime = data?.metadata?.start_time ?? 0
             const endTime = data?.metadata?.end_time ?? startTime
+            const payloadMeetingId = data?.metadata?.meeting_id
+            
+            setMeetingId((prev) => prev || payloadMeetingId || null)
 
             if (sentenceStartRef.current === null) {
               sentenceStartRef.current = startTime
@@ -303,5 +322,6 @@ export function useWhisperStream() {
     start,
     stop,
     source,
+    meetingId,
   }
 }
