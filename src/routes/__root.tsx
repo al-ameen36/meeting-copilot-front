@@ -11,7 +11,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
-import { AuthProvider } from '#/contexts/AuthContext'
+import { AuthProvider } from '#/features/auth/AuthContext'
 
 interface MyRouterContext {
   queryClient: QueryClient

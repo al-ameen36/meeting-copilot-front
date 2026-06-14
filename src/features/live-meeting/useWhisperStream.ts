@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react'
-import { useAuth } from '#/contexts/AuthContext'
+import { useAuth } from '#/features/auth/AuthContext'
 import { supabase } from '#/lib/supabase'
 import type { Insight } from '#/types/transcripts'
 
@@ -268,7 +268,7 @@ export function useWhisperStream() {
             const startTime = data?.metadata?.start_time ?? 0
             const endTime = data?.metadata?.end_time ?? startTime
             const payloadMeetingId = data?.metadata?.meeting_id
-            
+
             setMeetingId((prev) => prev || payloadMeetingId || null)
 
             if (sentenceStartRef.current === null) {
