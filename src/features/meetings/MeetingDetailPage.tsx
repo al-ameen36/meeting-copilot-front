@@ -3,9 +3,8 @@ import { ArrowLeft, Clock, CalendarDays, MessageSquare } from 'lucide-react'
 import { supabase } from '#/lib/supabase'
 import { useState } from 'react'
 
-import { InsightCard } from '#/features/insights/InsightCard'
 import { ChatPanel } from '#/features/chat/ChatPanel'
-import type { Insight, Meeting, Segment } from '#/types/transcripts'
+import type { Meeting, Segment } from '#/types/transcripts'
 import { formatTime } from '#/lib/utils'
 
 export const Route = createFileRoute('/meetings/$meetingId')({
@@ -31,12 +30,6 @@ export const Route = createFileRoute('/meetings/$meetingId')({
       throw new Error('Meeting not found')
     }
 
-    const { data: insights } = await supabase
-      .from('insights')
-      .select('*')
-      .eq('meeting_id', meetingId)
-      .order('start_time', { ascending: true })
-
     const { data: segments } = await supabase
       .from('segments')
       .select('*')
@@ -48,24 +41,14 @@ export const Route = createFileRoute('/meetings/$meetingId')({
 
     return {
       meeting: meeting as Meeting,
-      insights: (insights ?? []) as Insight[],
       segments: (segments ?? []) as Segment[],
     }
   },
 })
 
 function MeetingDetail() {
-  const { meeting, insights, segments } = Route.useLoaderData()
+  const { meeting, segments } = Route.useLoaderData()
   const [isChatOpen, setIsChatOpen] = useState(false)
-
-  const importantInsights = insights.filter(
-    (i) =>
-      i.type === 'action_item' || i.type === 'decision' || i.type === 'risk',
-  )
-
-  const generalInsights = insights.filter(
-    (i) => i.type === 'follow_up' || i.type === 'update',
-  )
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
@@ -147,44 +130,21 @@ function MeetingDetail() {
 
           <div className="space-y-8">
             <div>
-              <h2 className="text-sm uppercase tracking-widest text-amber-500 font-semibold mb-4 border-b border-zinc-900 pb-2">
-                Important insights ({importantInsights.length})
-              </h2>
-
-              {importantInsights.length > 0 ? (
-                <div className="space-y-3 h-[280px] overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                  {importantInsights.map((insight, idx) => (
-                    <InsightCard key={insight.id ?? idx} insight={insight} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-zinc-500 text-sm">No important insights.</p>
-              )}
-            </div>
-
-            <div>
               <h2 className="text-sm uppercase tracking-widest text-blue-500 font-semibold mb-4 border-b border-zinc-900 pb-2">
-                General ({generalInsights.length})
+                Chat
               </h2>
 
-              {generalInsights.length > 0 ? (
-                <div className="space-y-3 h-[280px] overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                  {generalInsights.map((insight, idx) => (
-                    <InsightCard key={insight.id ?? idx} insight={insight} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-zinc-500 text-sm">No general insights.</p>
-              )}
-            </div>
+              <p className="text-zinc-500 text-sm mb-4">
+                Use the chat to ask questions about the meeting transcript.
+              </p>
 
-            {insights.length === 0 && (
-              <div className="flex flex-col items-center justify-center p-8 bg-zinc-950/50 rounded-md border border-zinc-800/50 border-dashed">
-                <p className="text-zinc-500 text-sm">
-                  No insights were detected.
-                </p>
-              </div>
-            )}
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-medium"
+              >
+                Open Chat
+              </button>
+            </div>
           </div>
         </div>
       </div>

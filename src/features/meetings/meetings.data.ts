@@ -9,14 +9,6 @@ export type Meeting = {
   created_at: string
 }
 
-export type Insight = {
-  id: string
-  content: string
-  segment_id: string
-  start_time: number
-  type: string
-}
-
 export type Segment = {
   id: string
   content: string
@@ -27,7 +19,6 @@ export type Segment = {
 
 export type MeetingDetailLoaderData = {
   meeting: Meeting
-  insights: Array<Insight>
   segments: Array<Segment>
 }
 
@@ -63,15 +54,8 @@ export async function getMeetingDetail(
     .eq('meeting_id', meetingId)
     .order('start_time', { ascending: true })
 
-  const { data: insights } = await supabase
-    .from('insights')
-    .select('*')
-    .eq('meeting_id', meetingId)
-    .order('start_time', { ascending: true })
-
   return {
     meeting: meeting as Meeting,
-    insights: (insights ?? []) as Array<Insight>,
     segments: (segments ?? []) as Array<Segment>,
   }
 }

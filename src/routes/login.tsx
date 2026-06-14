@@ -52,8 +52,8 @@ function Login() {
             </h1>
             <p className="text-zinc-400 text-sm">
               {isSignUp
-                ? 'Sign up to start tracking commitments and insights'
-                : 'Sign in to access your meeting transcripts and insights'}
+                ? 'Sign up to start tracking commitments'
+                : 'Sign in to access your meeting transcripts'}
             </p>
           </div>
 

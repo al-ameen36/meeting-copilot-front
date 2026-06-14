@@ -67,7 +67,7 @@ function MeetingsDashboard() {
               Past Meetings
             </h1>
             <p className="text-zinc-500 text-sm mt-1">
-              Review your historical transcripts and extracted insights.
+              Review your historical transcripts.
             </p>
           </div>
 

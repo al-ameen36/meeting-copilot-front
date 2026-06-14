@@ -1,5 +1,5 @@
 import { useNavigate, Link } from '@tanstack/react-router'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { LogOut, History, MessageSquare } from 'lucide-react'
 
 import { useWhisperStream } from '#/features/live-meeting/useWhisperStream'
@@ -8,22 +8,13 @@ import { useAuth } from '#/features/auth/AuthContext'
 import { useNetwork } from '#/hooks/use-network'
 
 import { TranscriptDisplay } from '#/features/transcript/TranscriptDisplay'
-import { InsightCard } from '#/features/insights/InsightCard'
 import { SourceSelector } from '#/components/SourceSelector'
 import { StartButton } from '#/components/StartButton'
 import { ChatPanel } from '#/features/chat/ChatPanel'
 
-type FilterType =
-  | 'all'
-  | 'action_item'
-  | 'decision'
-  | 'risk'
-  | 'follow_up'
-  | 'update'
-
 export default function LiveMeetingPage() {
   const navigate = useNavigate()
-  const { active, segments, liveText, insights, start, stop, meetingId } =
+  const { active, segments, liveText, start, stop, meetingId } =
     useWhisperStream()
 
   const { user, isLoading } = useAuth()
@@ -31,7 +22,6 @@ export default function LiveMeetingPage() {
 
   const [source, setSource] = useState<'mic' | 'tab'>('mic')
   const [disableRecBtn, setDisableRecBtn] = useState(false)
-  const [filter, setFilter] = useState<FilterType>('all')
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   useEffect(() => {
@@ -58,20 +48,6 @@ export default function LiveMeetingPage() {
     start(source)
     setDisableRecBtn(false)
   }
-
-  const filteredInsights = useMemo(() => {
-    if (filter === 'all') return insights
-    return insights.filter((i) => i.type === filter)
-  }, [insights, filter])
-
-  const filters: FilterType[] = [
-    'all',
-    'action_item',
-    'decision',
-    'risk',
-    'follow_up',
-    'update',
-  ]
 
   if (isLoading) {
     return <div className="min-h-screen bg-black" />
@@ -157,45 +133,7 @@ export default function LiveMeetingPage() {
           isListening={active}
         />
 
-        {/* INSIGHTS */}
-        <div className="space-y-4 flex-1 pb-10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-              Insights
-            </h2>
-
-            {/* FILTER */}
-            <div className="flex gap-2 flex-wrap">
-              {filters.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={`px-3 py-1 text-xs rounded-md border transition ${
-                    filter === type
-                      ? 'bg-zinc-800 border-zinc-600 text-white'
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {filteredInsights.length > 0 ? (
-            <div className="space-y-3 h-[500px] overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-zinc-700">
-              {filteredInsights.map((insight) => (
-                <InsightCard key={insight.id} insight={insight} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12">
-              <p className="text-zinc-500 text-sm">
-                No insights for this filter
-              </p>
-            </div>
-          )}
-        </div>
+        {/* (Insights removed) */}
       </div>
 
       {meetingId && (

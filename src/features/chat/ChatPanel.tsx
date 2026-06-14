@@ -53,7 +53,7 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
 
     const userMsg: Message = { role: 'user', content: query.trim() }
     const currentHistory = [...messages]
-    
+
     setMessages([...currentHistory, userMsg])
     setQuery('')
     setIsStreaming(true)
@@ -83,13 +83,16 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
         for (;;) {
           const chunk = await reader.read()
           if (chunk.done) break
-          
+
           assistantContent += decoder.decode(chunk.value, { stream: true })
-          
+
           // Update the last message
           setMessages((prev) => {
             const updated = [...prev]
-            updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+            updated[updated.length - 1] = {
+              role: 'assistant',
+              content: assistantContent,
+            }
             return updated
           })
         }
@@ -98,7 +101,11 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
       console.error('Chat error:', error)
       setMessages((prev) => {
         const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: 'Sorry, I encountered an error while processing your request.' }
+        updated[updated.length - 1] = {
+          role: 'assistant',
+          content:
+            'Sorry, I encountered an error while processing your request.',
+        }
         return updated
       })
     } finally {
@@ -110,22 +117,24 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
     <>
       {/* Backdrop */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
           onClick={onClose}
         />
       )}
-      
+
       {/* Slide-over panel */}
-      <div 
+      <div
         className={`fixed top-0 right-0 h-full w-full sm:w-[400px] bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-          <h2 className="text-lg font-semibold text-white">Chat with Meeting</h2>
-          <button 
+          <h2 className="text-lg font-semibold text-white">
+            Chat with Meeting
+          </h2>
+          <button
             onClick={onClose}
             className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
           >
@@ -138,21 +147,26 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-50">
               <Bot className="w-12 h-12 text-zinc-500" />
-              <p className="text-sm text-zinc-400">Ask questions about the meeting<br/>transcript and insights.</p>
+              <p className="text-sm text-zinc-400">
+                Ask questions about the meeting transcript.
+              </p>
             </div>
           ) : (
             messages.map((msg, idx) => (
-              <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                key={idx}
+                className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
                 {msg.role === 'assistant' && (
                   <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0">
                     <Bot className="w-4 h-4 text-zinc-300" />
                   </div>
                 )}
-                
-                <div 
+
+                <div
                   className={`px-4 py-2.5 rounded-2xl max-w-[85%] text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-tr-sm' 
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white rounded-tr-sm'
                       : 'bg-zinc-800 text-zinc-200 rounded-tl-sm'
                   }`}
                 >

@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useAuth } from '#/features/auth/AuthContext'
 import { supabase } from '#/lib/supabase'
-import type { Insight } from '#/types/transcripts'
 
 type AudioSource = 'mic' | 'tab'
 
@@ -34,7 +33,7 @@ export function useWhisperStream() {
 
   const [active, setActive] = useState(false)
   const [source, setSource] = useState<AudioSource>('mic')
-  const [insights, setInsights] = useState<Insight[]>([])
+
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const [liveText, setLiveText] = useState('')
   const [meetingId, setMeetingId] = useState<string | null>(null)
@@ -151,7 +150,7 @@ export function useWhisperStream() {
 
       setSegments([])
       setLiveText('')
-      setInsights([])
+
       setMeetingId(null)
       setSource(selectedSource)
 
@@ -250,10 +249,7 @@ export function useWhisperStream() {
             return
           }
 
-          if (data.message === 'Insight') {
-            setInsights((prev) => [data.data as Insight, ...prev])
-            return
-          }
+          // insights removed: we no longer handle Insight messages
 
           const text = data?.metadata?.transcript?.trim()
           if (!text) return
@@ -318,7 +314,6 @@ export function useWhisperStream() {
     active,
     segments,
     liveText,
-    insights,
     start,
     stop,
     source,
