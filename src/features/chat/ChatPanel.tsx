@@ -16,7 +16,7 @@ interface Message {
 
 function AssistantMessage({ content }: { content: string }) {
   return (
-    <div className="prose prose-invert prose-zinc max-w-none text-sm leading-relaxed prose-p:my-0 prose-headings:my-2 prose-headings:text-zinc-100 prose-headings:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:pl-0 prose-a:text-blue-300 prose-a:underline prose-a:underline-offset-2 prose-code:break-words prose-code:text-zinc-100 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:rounded-md prose-pre:bg-zinc-950 prose-pre:p-3">
+    <div className="prose prose-invert prose-sm max-w-none">
       <ReactMarkdown>{content}</ReactMarkdown>
     </div>
   )
