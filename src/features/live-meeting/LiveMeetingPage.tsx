@@ -59,9 +59,9 @@ export default function LiveMeetingPage() {
 
   return (
     <div className="size-full bg-gradient-to-br from-zinc-950 via-zinc-950 to-zinc-900 text-white overflow-auto relative">
-      <div className="max-w-5xl mx-auto p-6 space-y-8 min-h-screen relative z-10">
+      <div className="max-w-5xl mx-auto p-6 space-y-8 min-h-screen relative z-10 pt-30">
         {/* HEADER */}
-        <div className="flex items-center justify-between">
+        <div className="fixed bg-zinc-900/60 backdrop-blur-sm z-1 top-0 left-0 right-0 px-6 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div
@@ -132,8 +132,6 @@ export default function LiveMeetingPage() {
           liveText={liveText}
           isListening={active}
         />
-
-        {/* (Insights removed) */}
       </div>
 
       {meetingId && (

@@ -1,11 +1,14 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { getMeetings } from '#/features/meetings/meetings.data'
-import { MeetingsDashboardPage } from '#/features/meetings/MeetingsDashboardPage'
+import MeetingsDashboard from '#/features/meetings/MeetingsDashboardPage'
 import { supabase } from '#/lib/supabase'
 
 export const Route = createFileRoute('/meetings/')({
-  component: MeetingsDashboardPage,
+  component: function MeetingsDashboardWrapper() {
+    const { meetings } = Route.useLoaderData()
+    return <MeetingsDashboard meetings={meetings} />
+  },
   loader: async () => {
     const {
       data: { session },

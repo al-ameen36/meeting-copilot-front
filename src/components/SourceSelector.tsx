@@ -16,7 +16,7 @@ export function SourceSelector({
   ]
 
   return (
-    <div className="flex gap-2 p-1 bg-zinc-900/50 backdrop-blur-xl rounded-md border border-zinc-800/50">
+    <div className="flex gap-2 p-1 bg-zinc-900 backdrop-blur-xl rounded-md border border-zinc-600/50">
       {sources.map((source) => {
         const Icon = source.icon
         const isActive = selectedSource === source.id

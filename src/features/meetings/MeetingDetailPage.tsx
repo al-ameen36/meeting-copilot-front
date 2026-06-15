@@ -1,53 +1,14 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { ArrowLeft, Clock, CalendarDays, MessageSquare } from 'lucide-react'
-import { supabase } from '#/lib/supabase'
 import { useState } from 'react'
 
 import { ChatPanel } from '#/features/chat/ChatPanel'
 import type { Meeting, Segment } from '#/types/transcripts'
 import { formatTime } from '#/lib/utils'
 
-export const Route = createFileRoute('/meetings/$meetingId')({
-  component: MeetingDetail,
-  loader: async ({ params }) => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+// Component now receives `meeting` and `segments` as props supplied by the route wrapper
 
-    if (!session) {
-      throw redirect({ to: '/login' })
-    }
-
-    const { meetingId } = params
-
-    const { data: meeting } = await supabase
-      .from('meetings')
-      .select('*')
-      .eq('id', meetingId)
-      .single()
-
-    if (!meeting) {
-      throw new Error('Meeting not found')
-    }
-
-    const { data: segments } = await supabase
-      .from('segments')
-      .select('*')
-      .eq('meeting_id', meetingId)
-      .order('start_time', { ascending: true })
-
-    console.log(meeting)
-    console.log(segments)
-
-    return {
-      meeting: meeting as Meeting,
-      segments: (segments ?? []) as Segment[],
-    }
-  },
-})
-
-function MeetingDetail() {
-  const { meeting, segments } = Route.useLoaderData()
+function MeetingDetail({ meeting, segments }: { meeting: Meeting; segments: Segment[] }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   return (
@@ -157,3 +118,5 @@ function MeetingDetail() {
     </div>
   )
 }
+
+export default MeetingDetail

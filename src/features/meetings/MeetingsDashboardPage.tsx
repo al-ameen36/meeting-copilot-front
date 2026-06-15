@@ -1,39 +1,9 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { Calendar, Clock, ChevronRight, LogOut } from 'lucide-react'
 import { supabase } from '#/lib/supabase'
+import type { Meeting } from '#/features/meetings/meetings.data'
 
-type Meeting = {
-  id: string
-  title: string
-  status: string
-  start_time: string | null
-  end_time: string | null
-  created_at: string
-}
-
-export const Route = createFileRoute('/meetings/')({
-  component: MeetingsDashboard,
-  loader: async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session) {
-      throw redirect({ to: '/login' })
-    }
-
-    const { data: meetings, error } = await supabase
-      .from('meetings')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching meetings:', error)
-    }
-
-    return { meetings: (meetings ?? []) as Meeting[] }
-  },
-})
+// Component now receives `meetings` as a prop supplied by the route wrapper
 
 function formatDisplayTime(dateString: string | null) {
   if (!dateString) return '--:--'
@@ -49,8 +19,7 @@ function getDurationMinutes(start: string | null, end: string | null) {
   return Math.round(diff / 60000)
 }
 
-function MeetingsDashboard() {
-  const { meetings } = Route.useLoaderData()
+function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -160,3 +129,5 @@ function MeetingsDashboard() {
     </div>
   )
 }
+
+export default MeetingsDashboard

@@ -4,11 +4,14 @@ import {
   getMeetingDetail,
   type MeetingDetailLoaderData,
 } from '#/features/meetings/meetings.data'
-import { MeetingDetailPage } from '#/features/meetings/MeetingDetailPage'
+import MeetingDetail from '#/features/meetings/MeetingDetailPage'
 import { supabase } from '#/lib/supabase'
 
 export const Route = createFileRoute('/meetings/$meetingId')({
-  component: MeetingDetailPage,
+  component: function MeetingDetailWrapper() {
+    const { meeting, segments } = Route.useLoaderData()
+    return <MeetingDetail meeting={meeting} segments={segments} />
+  },
   loader: async ({ params }): Promise<MeetingDetailLoaderData> => {
     const {
       data: { session },
