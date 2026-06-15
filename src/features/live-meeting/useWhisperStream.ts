@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useAuth } from '#/features/auth/AuthContext'
-import { supabase } from '#/lib/supabase'
+import { createMeeting, addSegment } from '#/lib/localdb/transcriptStore'
 
 type AudioSource = 'mic' | 'tab'
 
@@ -10,22 +10,83 @@ type TranscriptSegment = {
   text: string
 }
 
-const removeOverlap = (base: string, partial: string) => {
-  const cleanBase = base.trim()
-  const cleanPartial = partial.trim()
+const normalizeToken = (word: string) =>
+  word.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
 
-  if (!cleanBase || !cleanPartial) return cleanPartial
+const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean)
 
-  const baseWords = cleanBase.split(/\s+/)
+// Removes immediate duplicate words inside a single chunk.
+// Example: "I I think think so" -> "I think so"
+const collapseAdjacentDuplicates = (text: string) => {
+  const words = wordsOf(text)
+  const out: string[] = []
 
-  for (let i = baseWords.length; i > 0; i--) {
-    const overlap = baseWords.slice(-i).join(' ')
-    if (cleanPartial.startsWith(overlap)) {
-      return cleanPartial.slice(overlap.length).trim()
+  for (const word of words) {
+    const prev = out[out.length - 1]
+    if (!prev || normalizeToken(prev) !== normalizeToken(word)) {
+      out.push(word)
     }
   }
 
-  return cleanPartial
+  return out.join(' ')
+}
+
+// Merges a new STT chunk into the existing buffer by removing overlap.
+const mergeChunk = (existing: string, incoming: string) => {
+  const left = wordsOf(existing)
+  const right = wordsOf(collapseAdjacentDuplicates(incoming))
+
+  if (!left.length) return right.join(' ')
+  if (!right.length) return existing.trim()
+
+  const maxOverlap = Math.min(12, left.length, right.length)
+
+  for (let overlap = maxOverlap; overlap >= 1; overlap--) {
+    let matched = true
+
+    for (let i = 0; i < overlap; i++) {
+      if (
+        normalizeToken(left[left.length - overlap + i]) !==
+        normalizeToken(right[i])
+      ) {
+        matched = false
+        break
+      }
+    }
+
+    if (matched) {
+      return [...left, ...right.slice(overlap)].join(' ')
+    }
+  }
+
+  return [...left, ...right].join(' ')
+}
+
+// Remove overlapping prefix of `incoming` that duplicates a suffix of `existing`.
+const removeOverlap = (existing: string, incoming: string) => {
+  const left = wordsOf(existing)
+  const right = wordsOf(incoming)
+  if (!left.length) return right.join(' ')
+  if (!right.length) return ''
+
+  const maxOverlap = Math.min(12, left.length, right.length)
+  for (let overlap = maxOverlap; overlap >= 1; overlap--) {
+    let matched = true
+    for (let i = 0; i < overlap; i++) {
+      if (
+        normalizeToken(left[left.length - overlap + i]) !==
+        normalizeToken(right[i])
+      ) {
+        matched = false
+        break
+      }
+    }
+    if (matched) {
+      return right.slice(overlap).join(' ')
+    }
+  }
+
+  return right.join(' ')
 }
 
 export function useWhisperStream() {
@@ -33,7 +94,6 @@ export function useWhisperStream() {
 
   const [active, setActive] = useState(false)
   const [source, setSource] = useState<AudioSource>('mic')
-
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const [liveText, setLiveText] = useState('')
   const [meetingId, setMeetingId] = useState<string | null>(null)
@@ -47,54 +107,60 @@ export function useWhisperStream() {
   const transcriptLinesRef = useRef<TranscriptSegment[]>([])
   const sentenceBufferRef = useRef('')
   const sentenceStartRef = useRef<number | null>(null)
-  const partialRef = useRef('')
   const cleanedUpRef = useRef(false)
   const isActiveRef = useRef(false)
+  const meetingIdRef = useRef<string | null>(null)
 
   const getAudioStream = (selectedSource: AudioSource) => {
     if (selectedSource === 'mic') {
       return navigator.mediaDevices.getUserMedia({ audio: true })
     }
-
-    return navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true,
-    })
+    return navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
   }
 
-  const updateTranscript = useCallback(() => {
-    const finalSegments = transcriptLinesRef.current
+  const flushSentence = useCallback((endTime: number) => {
+    let text = sentenceBufferRef.current.trim()
+    if (!text) return
 
-    setSegments([...finalSegments])
-
-    const liveBase = sentenceBufferRef.current.trim()
-    const livePartial = partialRef.current.trim()
-    const cleanPartial = removeOverlap(liveBase, livePartial)
-    const combinedLive = [liveBase, cleanPartial]
-      .filter(Boolean)
-      .join(' ')
-      .trim()
-
-    setLiveText(combinedLive)
-  }, [])
-
-  const flushSentence = useCallback(
-    (endTime: number) => {
-      const text = sentenceBufferRef.current.trim()
-      if (!text) return
-
-      transcriptLinesRef.current.push({
-        start: sentenceStartRef.current ?? endTime,
-        end: endTime,
-        text,
-      })
-
+    // Trim overlap against the last committed segment to avoid merged repeats
+    const lastText = transcriptLinesRef.current.at(-1)?.text ?? ''
+    text = removeOverlap(lastText, text)
+    if (!text) {
+      // nothing new after trimming
       sentenceBufferRef.current = ''
       sentenceStartRef.current = null
-      updateTranscript()
-    },
-    [updateTranscript],
-  )
+      setLiveText('')
+      return
+    }
+
+    const startTime = sentenceStartRef.current ?? endTime
+
+    // Normalize / collapse adjacent duplicates before storing/display
+    const finalText = collapseAdjacentDuplicates(text)
+
+    const segment: TranscriptSegment = {
+      start: startTime,
+      end: endTime,
+      text: finalText,
+    }
+
+    transcriptLinesRef.current.push(segment)
+    setSegments([...transcriptLinesRef.current])
+    setLiveText('')
+
+    if (meetingIdRef.current) {
+      void addSegment({
+        id: crypto.randomUUID(),
+        meetingId: meetingIdRef.current,
+        start: startTime,
+        end: endTime,
+        text: finalText,
+      })
+    }
+
+    sentenceBufferRef.current = ''
+    sentenceStartRef.current = null
+  }, [])
 
   const cleanup = useCallback(async () => {
     if (cleanedUpRef.current) return
@@ -120,6 +186,7 @@ export function useWhisperStream() {
     streamRef.current = null
     sourceNodeRef.current = null
     workletNodeRef.current = null
+    meetingIdRef.current = null
 
     setActive(false)
   }, [])
@@ -146,13 +213,21 @@ export function useWhisperStream() {
       transcriptLinesRef.current = []
       sentenceBufferRef.current = ''
       sentenceStartRef.current = null
-      partialRef.current = ''
 
       setSegments([])
       setLiveText('')
-
       setMeetingId(null)
       setSource(selectedSource)
+
+      const localMeetingId = crypto.randomUUID()
+      meetingIdRef.current = localMeetingId
+      setMeetingId(localMeetingId)
+
+      void createMeeting({
+        id: localMeetingId,
+        title: 'Local meeting',
+        createdAt: Date.now(),
+      })
 
       const socket = new WebSocket(import.meta.env.VITE_WHISPER_SERVER_URL)
       socketRef.current = socket
@@ -190,16 +265,12 @@ export function useWhisperStream() {
           registerProcessor('vow-processor', VowProcessor)
         `
 
-        const blob = new Blob([workletCode], { type: 'application/javascript' })
+        const blob = new Blob([workletCode], {
+          type: 'application/javascript',
+        })
         const url = URL.createObjectURL(blob)
-
         await audioCtx.audioWorklet.addModule(url)
         URL.revokeObjectURL(url)
-
-        if (!isActiveRef.current) {
-          await audioCtx.close().catch(() => {})
-          return
-        }
 
         const sourceNode = audioCtx.createMediaStreamSource(stream)
         const workletNode = new AudioWorkletNode(audioCtx, 'vow-processor')
@@ -222,7 +293,7 @@ export function useWhisperStream() {
         setActive(true)
       }
 
-      socket.onopen = async () => {
+      socket.onopen = () => {
         socket.send(JSON.stringify({ token: session.access_token }))
       }
 
@@ -231,61 +302,38 @@ export function useWhisperStream() {
 
         try {
           const data = JSON.parse(event.data as string)
+
           if (data.message === 'auth_ok') {
-            // The backend creates a new meeting row just before sending auth_ok.
-            // Since we can't change the backend payload, we query the latest meeting.
-            const { data: latestMeeting } = await supabase
-              .from('meetings')
-              .select('id')
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single()
-
-            if (latestMeeting) {
-              setMeetingId(latestMeeting.id)
-            }
-
             await beginAudio()
             return
           }
-
-          // insights removed: we no longer handle Insight messages
 
           const text = data?.metadata?.transcript?.trim()
           if (!text) return
 
           if (data.message === 'AddPartialTranscript') {
-            partialRef.current = text
-            updateTranscript()
+            const preview = mergeChunk(sentenceBufferRef.current, text)
+            setLiveText(preview)
             return
           }
 
           if (data.message === 'AddTranscript') {
             const startTime = data?.metadata?.start_time ?? 0
             const endTime = data?.metadata?.end_time ?? startTime
-            const payloadMeetingId = data?.metadata?.meeting_id
-
-            setMeetingId((prev) => prev || payloadMeetingId || null)
 
             if (sentenceStartRef.current === null) {
               sentenceStartRef.current = startTime
             }
 
-            sentenceBufferRef.current = sentenceBufferRef.current
-              ? `${sentenceBufferRef.current} ${text}`
-              : text
+            sentenceBufferRef.current = mergeChunk(
+              sentenceBufferRef.current,
+              text,
+            )
+            setLiveText(sentenceBufferRef.current.trim())
 
-            const chunkLooksComplete =
-              sentenceBufferRef.current.length >= 80 &&
-              (/[.!?]\s*$/.test(sentenceBufferRef.current) || text.length < 3)
-
-            if (chunkLooksComplete) {
+            if (/[.!?]\s*$/.test(sentenceBufferRef.current.trim())) {
               flushSentence(endTime)
-            } else {
-              updateTranscript()
             }
-
-            partialRef.current = ''
           }
         } catch {
           // ignore malformed packets
@@ -300,14 +348,7 @@ export function useWhisperStream() {
         void cleanup()
       }
     },
-    [
-      cleanup,
-      flushSentence,
-      session?.access_token,
-      source,
-      stop,
-      updateTranscript,
-    ],
+    [cleanup, flushSentence, session?.access_token, source, stop],
   )
 
   return {

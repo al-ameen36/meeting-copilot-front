@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { getSegments } from '#/lib/localdb/transcriptStore'
 import { X, Send, Bot, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
@@ -62,12 +63,41 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
     try {
+      // Retrieve segments and pick context using a simple heuristic:
+      // 1) take last 30 segments
+      // 2) find keyword matches within the full history
+      // 3) merge keyword matches first, then last30, dedupe by id, cap at 50
+      let contextChunks: Array<{ id: string; start: number; text: string }> = []
+      try {
+        const segs = meetingId ? await getSegments(meetingId) : []
+        const last30 = segs.slice(-30)
+        const q = userMsg.content.trim().toLowerCase()
+        const keywordMatches = q
+          ? segs.filter((s) => s.text && s.text.toLowerCase().includes(q))
+          : []
+
+        const combined = [...keywordMatches, ...last30]
+        const seen = new Set<string>()
+        const deduped: Array<{ id: string; start: number; text: string }> = []
+        for (const s of combined) {
+          if (seen.has(s.id)) continue
+          seen.add(s.id)
+          deduped.push({ id: s.id, start: s.start, text: s.text })
+          if (deduped.length >= 50) break
+        }
+
+        contextChunks = deduped
+      } catch (err) {
+        console.warn('Failed to load local segments for chat context', err)
+      }
+
       const response = await fetch(`/api/meetings/${meetingId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: userMsg.content,
           history: currentHistory,
+          context_chunks: contextChunks,
         }),
       })
 

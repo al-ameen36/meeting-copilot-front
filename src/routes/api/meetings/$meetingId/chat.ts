@@ -10,6 +10,7 @@ type ChatMessage = {
 type ChatRequestBody = {
   query: string
   history: Array<ChatMessage>
+  context_chunks?: Array<{ id: string; start: number; text: string }>
 }
 
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -74,9 +75,22 @@ const parseChatBody = (value: unknown): ChatRequestBody | null => {
     return null
   }
 
+  // optional context_chunks validation
+  const maybeChunks = (maybeBody as any).context_chunks
+  if (maybeChunks !== undefined) {
+    if (!Array.isArray(maybeChunks)) return null
+    for (const c of maybeChunks) {
+      if (!c || typeof c !== 'object') return null
+      if (typeof c.id !== 'string') return null
+      if (typeof c.start !== 'number') return null
+      if (typeof c.text !== 'string') return null
+    }
+  }
+
   return {
     query: maybeBody.query.trim(),
     history: maybeBody.history,
+    context_chunks: maybeChunks,
   }
 }
 
@@ -87,7 +101,10 @@ export const Route = createFileRoute('/api/meetings/$meetingId/chat')({
         const body = parseChatBody(await request.json().catch(() => null))
 
         if (!body) {
-          return jsonResponse({ error: 'Invalid chat request.' }, { status: 400 })
+          return jsonResponse(
+            { error: 'Invalid chat request.' },
+            { status: 400 },
+          )
         }
 
         const backendUrl = `${getBackendBaseUrl()}/meetings/${encodeURIComponent(

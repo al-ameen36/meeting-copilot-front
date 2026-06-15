@@ -1,20 +1,21 @@
-import { supabase } from '#/lib/supabase'
+import {
+  getSegments,
+  listMeetings,
+  getMeeting,
+} from '#/lib/localdb/transcriptStore'
 
 export type Meeting = {
   id: string
-  title: string
-  status?: string
-  start_time: string | null
-  end_time: string | null
-  created_at: string
+  title?: string
+  createdAt: number
 }
 
 export type Segment = {
   id: string
-  content: string
-  end_time: number
-  meeting_id: string
-  start_time: number
+  text: string
+  end?: number
+  meetingId: string
+  start: number
 }
 
 export type MeetingDetailLoaderData = {
@@ -23,36 +24,16 @@ export type MeetingDetailLoaderData = {
 }
 
 export async function getMeetings() {
-  const { data: meetings, error } = await supabase
-    .from('meetings')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching meetings:', error)
-  }
-
-  return (meetings ?? []) as Array<Meeting>
+  return (await listMeetings()) as Array<Meeting>
 }
 
 export async function getMeetingDetail(
   meetingId: string,
 ): Promise<MeetingDetailLoaderData> {
-  const { data: meeting } = await supabase
-    .from('meetings')
-    .select('*')
-    .eq('id', meetingId)
-    .single()
+  const meeting = await getMeeting(meetingId)
+  if (!meeting) throw new Error('Meeting not found')
 
-  if (!meeting) {
-    throw new Error('Meeting not found')
-  }
-
-  const { data: segments } = await supabase
-    .from('segments')
-    .select('*')
-    .eq('meeting_id', meetingId)
-    .order('start_time', { ascending: true })
+  const segments = await getSegments(meetingId)
 
   return {
     meeting: meeting as Meeting,

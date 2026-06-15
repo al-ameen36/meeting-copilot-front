@@ -8,7 +8,13 @@ import { formatTime } from '#/lib/utils'
 
 // Component now receives `meeting` and `segments` as props supplied by the route wrapper
 
-function MeetingDetail({ meeting, segments }: { meeting: Meeting; segments: Segment[] }) {
+function MeetingDetail({
+  meeting,
+  segments,
+}: {
+  meeting: Meeting
+  segments: Segment[]
+}) {
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   return (
@@ -32,13 +38,13 @@ function MeetingDetail({ meeting, segments }: { meeting: Meeting; segments: Segm
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-4 h-4" />
                   <span>
-                    {new Date(meeting.created_at).toLocaleDateString()}
+                    {new Date(meeting.createdAt).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
                   <span>
-                    {new Date(meeting.created_at).toLocaleTimeString([], {
+                    {new Date(meeting.createdAt).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -71,11 +77,10 @@ function MeetingDetail({ meeting, segments }: { meeting: Meeting; segments: Segm
                     className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3"
                   >
                     <div className="mb-2 text-[11px] uppercase tracking-widest text-zinc-500">
-                      {formatTime(segment.start_time)} →{' '}
-                      {formatTime(segment.end_time)}
+                      {formatTime(segment.start)} → {formatTime(segment.end)}
                     </div>
                     <div className="text-sm leading-relaxed text-zinc-100 whitespace-pre-wrap">
-                      {segment.content}
+                      {segment.text}
                     </div>
                   </div>
                 ))
