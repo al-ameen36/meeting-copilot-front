@@ -8,6 +8,18 @@ type TranscriptSegment = {
   start: number
   end: number
   text: string
+  speaker?: string
+}
+
+type SpeechmaticsAlternative = {
+  content?: string
+  speaker?: string
+}
+
+type SpeechmaticsResult = {
+  type?: string
+  attaches_to?: string
+  alternatives?: SpeechmaticsAlternative[]
 }
 
 const normalizeToken = (word: string) =>
@@ -15,8 +27,12 @@ const normalizeToken = (word: string) =>
 
 const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean)
 
-// Removes immediate duplicate words inside a single chunk.
-// Example: "I I think think so" -> "I think so"
+const cleanSpacedText = (text: string) =>
+  text
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+
 const collapseAdjacentDuplicates = (text: string) => {
   const words = wordsOf(text)
   const out: string[] = []
@@ -31,7 +47,6 @@ const collapseAdjacentDuplicates = (text: string) => {
   return out.join(' ')
 }
 
-// Merges a new STT chunk into the existing buffer by removing overlap.
 const mergeChunk = (existing: string, incoming: string) => {
   const left = wordsOf(existing)
   const right = wordsOf(collapseAdjacentDuplicates(incoming))
@@ -62,16 +77,18 @@ const mergeChunk = (existing: string, incoming: string) => {
   return [...left, ...right].join(' ')
 }
 
-// Remove overlapping prefix of `incoming` that duplicates a suffix of `existing`.
 const removeOverlap = (existing: string, incoming: string) => {
   const left = wordsOf(existing)
   const right = wordsOf(incoming)
+
   if (!left.length) return right.join(' ')
   if (!right.length) return ''
 
   const maxOverlap = Math.min(12, left.length, right.length)
+
   for (let overlap = maxOverlap; overlap >= 1; overlap--) {
     let matched = true
+
     for (let i = 0; i < overlap; i++) {
       if (
         normalizeToken(left[left.length - overlap + i]) !==
@@ -81,12 +98,62 @@ const removeOverlap = (existing: string, incoming: string) => {
         break
       }
     }
+
     if (matched) {
       return right.slice(overlap).join(' ')
     }
   }
 
   return right.join(' ')
+}
+
+const buildTranscriptFromResults = (results: SpeechmaticsResult[] = []) => {
+  let text = ''
+
+  for (const result of results) {
+    const alt = result.alternatives?.[0]
+    const content = alt?.content?.trim()
+    if (!content) continue
+
+    if (result.type === 'punctuation') {
+      text += content
+      continue
+    }
+
+    if (text && !text.endsWith(' ')) {
+      text += ' '
+    }
+
+    text += content
+  }
+
+  return cleanSpacedText(text)
+}
+
+// Returns the speaker label that appears most frequently across word results.
+// Punctuation tokens are skipped since they inherit speaker from adjacent words.
+const dominantSpeaker = (results: SpeechmaticsResult[]): string | null => {
+  const counts: Record<string, number> = {}
+
+  for (const result of results) {
+    if (result.type === 'punctuation') continue
+    const speaker = result.alternatives?.[0]?.speaker
+    if (typeof speaker === 'string' && speaker) {
+      counts[speaker] = (counts[speaker] ?? 0) + 1
+    }
+  }
+
+  let best: string | null = null
+  let bestCount = 0
+
+  for (const [speaker, count] of Object.entries(counts)) {
+    if (count > bestCount) {
+      best = speaker
+      bestCount = count
+    }
+  }
+
+  return best
 }
 
 export function useWhisperStream() {
@@ -96,57 +163,82 @@ export function useWhisperStream() {
   const [source, setSource] = useState<AudioSource>('mic')
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const [liveText, setLiveText] = useState('')
+  const [liveSpeaker, setLiveSpeaker] = useState<string | null>(null)
   const [meetingId, setMeetingId] = useState<string | null>(null)
 
   const socketRef = useRef<WebSocket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
 
   const transcriptLinesRef = useRef<TranscriptSegment[]>([])
   const sentenceBufferRef = useRef('')
   const sentenceStartRef = useRef<number | null>(null)
+  const sentenceSpeakerRef = useRef<string | null>(null)
   const cleanedUpRef = useRef(false)
   const isActiveRef = useRef(false)
   const meetingIdRef = useRef<string | null>(null)
 
-  const getAudioStream = (selectedSource: AudioSource) => {
+  const getAudioStream = async (selectedSource: AudioSource) => {
     if (selectedSource === 'mic') {
-      return navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      return { tabStream: stream, micStream: null }
     }
-    return navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+
+    // For tab capture: get the tab audio + a separate mic stream and mix them.
+    // getDisplayMedia must be called first (requires a direct user gesture).
+    const tabStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+    })
+
+    let micStream: MediaStream | null = null
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err) {
+      // Mic permission denied or unavailable — proceed with tab audio only.
+      console.warn(
+        'Mic unavailable for tab capture, using tab audio only:',
+        err,
+      )
+    }
+
+    return { tabStream, micStream }
   }
 
   const flushSentence = useCallback((endTime: number) => {
     let text = sentenceBufferRef.current.trim()
     if (!text) return
 
-    // Trim overlap against the last committed segment to avoid merged repeats
     const lastText = transcriptLinesRef.current.at(-1)?.text ?? ''
     text = removeOverlap(lastText, text)
+    text = collapseAdjacentDuplicates(text)
+
     if (!text) {
-      // nothing new after trimming
       sentenceBufferRef.current = ''
       sentenceStartRef.current = null
+      sentenceSpeakerRef.current = null
       setLiveText('')
+      setLiveSpeaker(null)
       return
     }
 
     const startTime = sentenceStartRef.current ?? endTime
-
-    // Normalize / collapse adjacent duplicates before storing/display
-    const finalText = collapseAdjacentDuplicates(text)
+    const speaker = sentenceSpeakerRef.current || undefined
 
     const segment: TranscriptSegment = {
       start: startTime,
       end: endTime,
-      text: finalText,
+      text,
+      speaker,
     }
 
     transcriptLinesRef.current.push(segment)
     setSegments([...transcriptLinesRef.current])
     setLiveText('')
+    setLiveSpeaker(null)
 
     if (meetingIdRef.current) {
       void addSegment({
@@ -154,12 +246,14 @@ export function useWhisperStream() {
         meetingId: meetingIdRef.current,
         start: startTime,
         end: endTime,
-        text: finalText,
+        text,
+        speaker,
       })
     }
 
     sentenceBufferRef.current = ''
     sentenceStartRef.current = null
+    sentenceSpeakerRef.current = null
   }, [])
 
   const cleanup = useCallback(async () => {
@@ -170,20 +264,20 @@ export function useWhisperStream() {
     try {
       sourceNodeRef.current?.disconnect()
     } catch {}
-
     try {
       workletNodeRef.current?.disconnect()
     } catch {}
-
     try {
       await audioCtxRef.current?.close()
     } catch {}
 
     streamRef.current?.getTracks().forEach((t) => t.stop())
+    micStreamRef.current?.getTracks().forEach((t) => t.stop())
 
     socketRef.current = null
     audioCtxRef.current = null
     streamRef.current = null
+    micStreamRef.current = null
     sourceNodeRef.current = null
     workletNodeRef.current = null
     meetingIdRef.current = null
@@ -213,9 +307,11 @@ export function useWhisperStream() {
       transcriptLinesRef.current = []
       sentenceBufferRef.current = ''
       sentenceStartRef.current = null
+      sentenceSpeakerRef.current = null
 
       setSegments([])
       setLiveText('')
+      setLiveSpeaker(null)
       setMeetingId(null)
       setSource(selectedSource)
 
@@ -233,9 +329,11 @@ export function useWhisperStream() {
       socketRef.current = socket
 
       const beginAudio = async () => {
-        let stream: MediaStream
+        let tabStream: MediaStream
+        let micStream: MediaStream | null = null
+
         try {
-          stream = await getAudioStream(selectedSource)
+          ;({ tabStream, micStream } = await getAudioStream(selectedSource))
         } catch (err) {
           console.warn('Audio permission/device error:', err)
           stop()
@@ -243,11 +341,13 @@ export function useWhisperStream() {
         }
 
         if (!isActiveRef.current) {
-          stream.getTracks().forEach((t) => t.stop())
+          tabStream.getTracks().forEach((t) => t.stop())
+          micStream?.getTracks().forEach((t) => t.stop())
           return
         }
 
-        streamRef.current = stream
+        streamRef.current = tabStream
+        micStreamRef.current = micStream
 
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
@@ -265,26 +365,40 @@ export function useWhisperStream() {
           registerProcessor('vow-processor', VowProcessor)
         `
 
-        const blob = new Blob([workletCode], {
-          type: 'application/javascript',
-        })
+        const blob = new Blob([workletCode], { type: 'application/javascript' })
         const url = URL.createObjectURL(blob)
         await audioCtx.audioWorklet.addModule(url)
         URL.revokeObjectURL(url)
 
-        const sourceNode = audioCtx.createMediaStreamSource(stream)
         const workletNode = new AudioWorkletNode(audioCtx, 'vow-processor')
-
-        sourceNodeRef.current = sourceNode
         workletNodeRef.current = workletNode
+
+        const tabSource = audioCtx.createMediaStreamSource(tabStream)
+        sourceNodeRef.current = tabSource
+
+        if (micStream) {
+          // Mix tab audio and mic into a single stream via a destination node,
+          // then pipe the merged output into the worklet.
+          const destination = audioCtx.createMediaStreamDestination()
+          tabSource.connect(destination)
+
+          const micSource = audioCtx.createMediaStreamSource(micStream)
+          micSource.connect(destination)
+
+          const mergedSource = audioCtx.createMediaStreamSource(
+            destination.stream,
+          )
+          mergedSource.connect(workletNode)
+        } else {
+          // Mic unavailable — wire tab audio directly.
+          tabSource.connect(workletNode)
+        }
 
         workletNode.port.onmessage = (event) => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(event.data)
           }
         }
-
-        sourceNode.connect(workletNode)
 
         if (audioCtx.state === 'suspended') {
           await audioCtx.resume()
@@ -308,12 +422,20 @@ export function useWhisperStream() {
             return
           }
 
-          const text = data?.metadata?.transcript?.trim()
+          const results: SpeechmaticsResult[] = Array.isArray(data?.results)
+            ? data.results
+            : []
+          const fallbackText = data?.metadata?.transcript?.trim() || ''
+          const text = buildTranscriptFromResults(results) || fallbackText
           if (!text) return
+
+          const speaker = dominantSpeaker(results)
 
           if (data.message === 'AddPartialTranscript') {
             const preview = mergeChunk(sentenceBufferRef.current, text)
+            if (speaker) sentenceSpeakerRef.current = speaker
             setLiveText(preview)
+            setLiveSpeaker(speaker ?? sentenceSpeakerRef.current)
             return
           }
 
@@ -325,11 +447,14 @@ export function useWhisperStream() {
               sentenceStartRef.current = startTime
             }
 
+            if (speaker) sentenceSpeakerRef.current = speaker
+
             sentenceBufferRef.current = mergeChunk(
               sentenceBufferRef.current,
               text,
             )
             setLiveText(sentenceBufferRef.current.trim())
+            setLiveSpeaker(sentenceSpeakerRef.current)
 
             if (/[.!?]\s*$/.test(sentenceBufferRef.current.trim())) {
               flushSentence(endTime)
@@ -355,6 +480,7 @@ export function useWhisperStream() {
     active,
     segments,
     liveText,
+    liveSpeaker,
     start,
     stop,
     source,

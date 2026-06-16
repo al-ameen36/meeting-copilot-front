@@ -1,15 +1,9 @@
+import type { Segment } from '#/types/transcripts'
+
 type Meeting = {
   id: string
   title?: string
   createdAt: number
-}
-
-type Segment = {
-  id: string
-  meetingId: string
-  start: number
-  end?: number
-  text: string
 }
 
 const DB_NAME = 'meeting_copilot_transcripts'
