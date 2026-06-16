@@ -18,7 +18,6 @@ type SpeechmaticsAlternative = {
 
 type SpeechmaticsResult = {
   type?: string
-  attaches_to?: string
   alternatives?: SpeechmaticsAlternative[]
 }
 
@@ -27,7 +26,7 @@ const normalizeToken = (word: string) =>
 
 const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean)
 
-const cleanSpacedText = (text: string) =>
+const cleanText = (text: string) =>
   text
     .replace(/\s+([,.;:!?])/g, '$1')
     .replace(/\s+/g, ' ')
@@ -39,9 +38,7 @@ const collapseAdjacentDuplicates = (text: string) => {
 
   for (const word of words) {
     const prev = out[out.length - 1]
-    if (!prev || normalizeToken(prev) !== normalizeToken(word)) {
-      out.push(word)
-    }
+    if (!prev || normalizeToken(prev) !== normalizeToken(word)) out.push(word)
   }
 
   return out.join(' ')
@@ -69,9 +66,7 @@ const mergeChunk = (existing: string, incoming: string) => {
       }
     }
 
-    if (matched) {
-      return [...left, ...right.slice(overlap)].join(' ')
-    }
+    if (matched) return [...left, ...right.slice(overlap)].join(' ')
   }
 
   return [...left, ...right].join(' ')
@@ -99,9 +94,7 @@ const removeOverlap = (existing: string, incoming: string) => {
       }
     }
 
-    if (matched) {
-      return right.slice(overlap).join(' ')
-    }
+    if (matched) return right.slice(overlap).join(' ')
   }
 
   return right.join(' ')
@@ -120,27 +113,20 @@ const buildTranscriptFromResults = (results: SpeechmaticsResult[] = []) => {
       continue
     }
 
-    if (text && !text.endsWith(' ')) {
-      text += ' '
-    }
-
+    if (text && !text.endsWith(' ')) text += ' '
     text += content
   }
 
-  return cleanSpacedText(text)
+  return cleanText(text)
 }
 
-// Returns the speaker label that appears most frequently across word results.
-// Punctuation tokens are skipped since they inherit speaker from adjacent words.
 const dominantSpeaker = (results: SpeechmaticsResult[]): string | null => {
   const counts: Record<string, number> = {}
 
   for (const result of results) {
     if (result.type === 'punctuation') continue
     const speaker = result.alternatives?.[0]?.speaker
-    if (typeof speaker === 'string' && speaker) {
-      counts[speaker] = (counts[speaker] ?? 0) + 1
-    }
+    if (speaker) counts[speaker] = (counts[speaker] ?? 0) + 1
   }
 
   let best: string | null = null
@@ -168,10 +154,11 @@ export function useWhisperStream() {
 
   const socketRef = useRef<WebSocket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const displayStreamRef = useRef<MediaStream | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
-  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const gainNodeRef = useRef<GainNode | null>(null)
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const inputNodesRef = useRef<AudioNode[]>([])
 
   const transcriptLinesRef = useRef<TranscriptSegment[]>([])
   const sentenceBufferRef = useRef('')
@@ -181,31 +168,23 @@ export function useWhisperStream() {
   const isActiveRef = useRef(false)
   const meetingIdRef = useRef<string | null>(null)
 
-  const getAudioStream = async (selectedSource: AudioSource) => {
+  const getAudioStreams = async (selectedSource: AudioSource) => {
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
     if (selectedSource === 'mic') {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      return { tabStream: stream, micStream: null }
+      return { displayStream: null, micStream }
     }
 
-    // For tab capture: get the tab audio + a separate mic stream and mix them.
-    // getDisplayMedia must be called first (requires a direct user gesture).
-    const tabStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true,
-    })
-
-    let micStream: MediaStream | null = null
     try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      })
+      return { displayStream, micStream }
     } catch (err) {
-      // Mic permission denied or unavailable — proceed with tab audio only.
-      console.warn(
-        'Mic unavailable for tab capture, using tab audio only:',
-        err,
-      )
+      console.warn('Display audio unavailable, using mic only:', err)
+      return { displayStream: null, micStream }
     }
-
-    return { tabStream, micStream }
   }
 
   const flushSentence = useCallback((endTime: number) => {
@@ -261,25 +240,34 @@ export function useWhisperStream() {
     cleanedUpRef.current = true
     isActiveRef.current = false
 
+    for (const node of inputNodesRef.current) {
+      try {
+        node.disconnect()
+      } catch {}
+    }
+
     try {
-      sourceNodeRef.current?.disconnect()
+      gainNodeRef.current?.disconnect()
     } catch {}
+
     try {
       workletNodeRef.current?.disconnect()
     } catch {}
+
     try {
       await audioCtxRef.current?.close()
     } catch {}
 
-    streamRef.current?.getTracks().forEach((t) => t.stop())
+    displayStreamRef.current?.getTracks().forEach((t) => t.stop())
     micStreamRef.current?.getTracks().forEach((t) => t.stop())
 
     socketRef.current = null
     audioCtxRef.current = null
-    streamRef.current = null
+    displayStreamRef.current = null
     micStreamRef.current = null
-    sourceNodeRef.current = null
+    gainNodeRef.current = null
     workletNodeRef.current = null
+    inputNodesRef.current = []
     meetingIdRef.current = null
 
     setActive(false)
@@ -329,11 +317,12 @@ export function useWhisperStream() {
       socketRef.current = socket
 
       const beginAudio = async () => {
-        let tabStream: MediaStream
-        let micStream: MediaStream | null = null
+        let displayStream: MediaStream | null = null
+        let micStream: MediaStream
 
         try {
-          ;({ tabStream, micStream } = await getAudioStream(selectedSource))
+          ;({ displayStream, micStream } =
+            await getAudioStreams(selectedSource))
         } catch (err) {
           console.warn('Audio permission/device error:', err)
           stop()
@@ -341,12 +330,12 @@ export function useWhisperStream() {
         }
 
         if (!isActiveRef.current) {
-          tabStream.getTracks().forEach((t) => t.stop())
-          micStream?.getTracks().forEach((t) => t.stop())
+          displayStream?.getTracks().forEach((t) => t.stop())
+          micStream.getTracks().forEach((t) => t.stop())
           return
         }
 
-        streamRef.current = tabStream
+        displayStreamRef.current = displayStream
         micStreamRef.current = micStream
 
         const audioCtx = new AudioContext({ sampleRate: 16000 })
@@ -356,8 +345,8 @@ export function useWhisperStream() {
           class VowProcessor extends AudioWorkletProcessor {
             process(inputs) {
               const input = inputs[0]
-              if (input && input[0]) {
-                this.port.postMessage(input[0].buffer)
+              if (input && input[0] && input[0].length) {
+                this.port.postMessage(input[0].slice(0).buffer)
               }
               return true
             }
@@ -371,31 +360,24 @@ export function useWhisperStream() {
         URL.revokeObjectURL(url)
 
         const workletNode = new AudioWorkletNode(audioCtx, 'vow-processor')
+        const gainNode = audioCtx.createGain()
+
         workletNodeRef.current = workletNode
+        gainNodeRef.current = gainNode
 
-        const tabSource = audioCtx.createMediaStreamSource(tabStream)
-        sourceNodeRef.current = tabSource
+        const micSource = audioCtx.createMediaStreamSource(micStream)
+        inputNodesRef.current.push(micSource)
+        micSource.connect(gainNode)
 
-        if (micStream) {
-          // Mix tab audio and mic into a single stream via a destination node,
-          // then pipe the merged output into the worklet.
-          const destination = audioCtx.createMediaStreamDestination()
-          tabSource.connect(destination)
-
-          const micSource = audioCtx.createMediaStreamSource(micStream)
-          micSource.connect(destination)
-
-          const mergedSource = audioCtx.createMediaStreamSource(
-            destination.stream,
-          )
-          mergedSource.connect(workletNode)
-        } else {
-          // Mic unavailable — wire tab audio directly.
-          tabSource.connect(workletNode)
+        if (displayStream && displayStream.getAudioTracks().length > 0) {
+          const displaySource = audioCtx.createMediaStreamSource(displayStream)
+          inputNodesRef.current.push(displaySource)
+          displaySource.connect(gainNode)
         }
 
+        gainNode.connect(workletNode)
         workletNode.port.onmessage = (event) => {
-          if (socket.readyState === WebSocket.OPEN) {
+          if (socket.readyState === WebSocket.OPEN && event.data?.byteLength) {
             socket.send(event.data)
           }
         }
@@ -465,8 +447,8 @@ export function useWhisperStream() {
         }
       }
 
-      socket.onerror = (err) => {
-        console.error('[WS] socket error', err)
+      socket.onerror = () => {
+        void cleanup()
       }
 
       socket.onclose = () => {
