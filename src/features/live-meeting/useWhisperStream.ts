@@ -2,6 +2,14 @@ import { useRef, useState, useCallback } from 'react'
 import { useAuth } from '#/features/auth/AuthContext'
 import { createMeeting, addSegment } from '#/lib/localdb/transcriptStore'
 
+import {
+  collapseAdjacentDuplicates,
+  mergeChunk,
+  removeOverlap,
+  buildTranscriptFromResults,
+  dominantSpeaker,
+} from './whisperHelpers'
+
 type AudioSource = 'mic' | 'tab'
 
 type TranscriptSegment = {
@@ -19,127 +27,6 @@ type SpeechmaticsAlternative = {
 type SpeechmaticsResult = {
   type?: string
   alternatives?: SpeechmaticsAlternative[]
-}
-
-const normalizeToken = (word: string) =>
-  word.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
-
-const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean)
-
-const cleanText = (text: string) =>
-  text
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-const collapseAdjacentDuplicates = (text: string) => {
-  const words = wordsOf(text)
-  const out: string[] = []
-
-  for (const word of words) {
-    const prev = out[out.length - 1]
-    if (!prev || normalizeToken(prev) !== normalizeToken(word)) out.push(word)
-  }
-
-  return out.join(' ')
-}
-
-const mergeChunk = (existing: string, incoming: string) => {
-  const left = wordsOf(existing)
-  const right = wordsOf(collapseAdjacentDuplicates(incoming))
-
-  if (!left.length) return right.join(' ')
-  if (!right.length) return existing.trim()
-
-  const maxOverlap = Math.min(12, left.length, right.length)
-
-  for (let overlap = maxOverlap; overlap >= 1; overlap--) {
-    let matched = true
-
-    for (let i = 0; i < overlap; i++) {
-      if (
-        normalizeToken(left[left.length - overlap + i]) !==
-        normalizeToken(right[i])
-      ) {
-        matched = false
-        break
-      }
-    }
-
-    if (matched) return [...left, ...right.slice(overlap)].join(' ')
-  }
-
-  return [...left, ...right].join(' ')
-}
-
-const removeOverlap = (existing: string, incoming: string) => {
-  const left = wordsOf(existing)
-  const right = wordsOf(incoming)
-
-  if (!left.length) return right.join(' ')
-  if (!right.length) return ''
-
-  const maxOverlap = Math.min(12, left.length, right.length)
-
-  for (let overlap = maxOverlap; overlap >= 1; overlap--) {
-    let matched = true
-
-    for (let i = 0; i < overlap; i++) {
-      if (
-        normalizeToken(left[left.length - overlap + i]) !==
-        normalizeToken(right[i])
-      ) {
-        matched = false
-        break
-      }
-    }
-
-    if (matched) return right.slice(overlap).join(' ')
-  }
-
-  return right.join(' ')
-}
-
-const buildTranscriptFromResults = (results: SpeechmaticsResult[] = []) => {
-  let text = ''
-
-  for (const result of results) {
-    const alt = result.alternatives?.[0]
-    const content = alt?.content?.trim()
-    if (!content) continue
-
-    if (result.type === 'punctuation') {
-      text += content
-      continue
-    }
-
-    if (text && !text.endsWith(' ')) text += ' '
-    text += content
-  }
-
-  return cleanText(text)
-}
-
-const dominantSpeaker = (results: SpeechmaticsResult[]): string | null => {
-  const counts: Record<string, number> = {}
-
-  for (const result of results) {
-    if (result.type === 'punctuation') continue
-    const speaker = result.alternatives?.[0]?.speaker
-    if (speaker) counts[speaker] = (counts[speaker] ?? 0) + 1
-  }
-
-  let best: string | null = null
-  let bestCount = 0
-
-  for (const [speaker, count] of Object.entries(counts)) {
-    if (count > bestCount) {
-      best = speaker
-      bestCount = count
-    }
-  }
-
-  return best
 }
 
 export function useWhisperStream() {
