@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { ChatPanel } from '#/features/chat/ChatPanel'
 import type { Meeting, Segment } from '#/types/transcripts'
-import { formatTime } from '#/lib/utils'
+import { formatTime, formatDate, formatDateTime } from '#/lib/utils'
 
 function MeetingDetail({
   meeting,
@@ -37,16 +37,13 @@ function MeetingDetail({
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-4 h-4" />
                   <span>
-                    {new Date(meeting.createdAt).toLocaleDateString()}
+                    {formatDate(meeting.createdAt)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
                   <span>
-                    {new Date(meeting.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTime(meeting.createdAt)}
                   </span>
                 </div>
               </div>

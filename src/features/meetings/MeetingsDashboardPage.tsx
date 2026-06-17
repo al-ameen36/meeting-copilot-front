@@ -1,14 +1,16 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { Calendar, Clock, ChevronRight, LogOut } from 'lucide-react'
 import { supabase } from '#/lib/supabase'
 import type { Meeting } from '#/types/transcripts'
+import { formatDateTime, formatMonthAbbr } from '#/lib/utils'
 
 // Component now receives `meetings` as a prop supplied by the route wrapper
 
 function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
+  const navigate = useNavigate()
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    navigate({ to: '/login' })
   }
 
   return (
@@ -70,9 +72,7 @@ function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
                     <div className="flex bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden shrink-0">
                       <div className="px-3 py-2 flex flex-col items-center justify-center bg-zinc-900/50 border-r border-zinc-800">
                         <span className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">
-                          {new Date(meeting.createdAt).toLocaleString('en-US', {
-                            month: 'short',
-                          })}
+                          {formatMonthAbbr(meeting.createdAt)}
                         </span>
                         <span className="text-lg font-bold text-zinc-200">
                           {new Date(meeting.createdAt).getDate()}
@@ -92,10 +92,7 @@ function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
                       <span>
-                        {new Date(meeting.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTime(meeting.createdAt)}
                       </span>
                     </div>
                   </div>

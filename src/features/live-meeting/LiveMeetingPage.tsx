@@ -115,7 +115,7 @@ export default function LiveMeetingPage() {
               <button
                 onClick={async () => {
                   await supabase.auth.signOut()
-                  window.location.href = '/login'
+                  navigate({ to: '/login' })
                 }}
                 className="p-2 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-md transition-all duration-200"
                 title="Sign Out"

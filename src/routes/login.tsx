@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { supabase } from '#/lib/supabase'
 
@@ -7,6 +7,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function Login() {
+  const navigate = useNavigate()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -32,8 +33,8 @@ function Login() {
           password,
         })
         if (error) throw error
-        // Redirect will be handled by auth listener propagating to protected route or manually doing:
-        window.location.href = '/'
+        // Navigate to home after successful sign‑in
+        navigate({ to: '/' })
       }
     } catch (err: any) {
       setError(isSignUp ? 'Signup Failed' : 'Login failed')
