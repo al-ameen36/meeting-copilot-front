@@ -10,6 +10,7 @@ import type { Meeting, Segment } from '#/types/transcripts'
 export type MeetingDetailLoaderData = {
   meeting: Meeting
   segments: Array<Segment>
+  insights: Array<any>
 }
 
 /** Convert local DB Meeting to shared Meeting shape */
@@ -40,6 +41,7 @@ export async function getMeetingDetail(
   return {
     meeting,
     segments: segments as Array<Segment>,
+    insights: [], // TODO: fetch insights from backend
   }
 }
 

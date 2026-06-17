@@ -3,15 +3,18 @@ import { ArrowLeft, Clock, CalendarDays, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 
 import { ChatPanel } from '#/features/chat/ChatPanel'
+import InsightCard from '#/components/InsightCard'
 import type { Meeting, Segment } from '#/types/transcripts'
 import { formatTime, formatDate, formatDateTime } from '#/lib/utils'
 
 function MeetingDetail({
   meeting,
   segments,
+  insights,
 }: {
   meeting: Meeting
   segments: Segment[]
+  insights: any[]
 }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
 
@@ -36,15 +39,11 @@ function MeetingDetail({
               <div className="flex items-center gap-4 text-sm text-zinc-500">
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-4 h-4" />
-                  <span>
-                    {formatDate(meeting.createdAt)}
-                  </span>
+                  <span>{formatDate(meeting.createdAt)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
-                  <span>
-                    {formatDateTime(meeting.createdAt)}
-                  </span>
+                  <span>{formatDateTime(meeting.createdAt)}</span>
                 </div>
               </div>
             </div>
@@ -89,13 +88,26 @@ function MeetingDetail({
             </div>
           </div>
         </div>
-      </div>
+        {/* Insights Section */}
+        {insights.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-sm uppercase tracking-widest text-zinc-500 font-semibold mb-2">
+              Insights
+            </h2>
+            <div className="space-y-3">
+              {insights.map((insight) => (
+                <InsightCard key={insight.id} insight={insight} />
+              ))}
+            </div>
+          </div>
+        )}
 
-      <ChatPanel
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        meetingId={meeting.id}
-      />
+        <ChatPanel
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          meetingId={meeting.id}
+        />
+      </div>
     </div>
   )
 }
