@@ -10,11 +10,11 @@ import {
   dominantSpeaker,
 } from './whisperHelpers'
 import { getAudioStreams, VOW_PROCESSOR_CODE } from './audioSetup'
+import { createWhisperSocket } from './socketHandler'
 
 import type {
   AudioSource,
   TranscriptSegment,
-  SpeechmaticsAlternative,
   SpeechmaticsResult,
 } from './types'
 
@@ -43,7 +43,6 @@ export function useWhisperStream() {
   const cleanedUpRef = useRef(false)
   const isActiveRef = useRef(false)
   const meetingIdRef = useRef<string | null>(null)
-
 
   const flushSentence = useCallback((endTime: number) => {
     let text = sentenceBufferRef.current.trim()
@@ -171,7 +170,50 @@ export function useWhisperStream() {
         createdAt: Date.now(),
       })
 
-      const socket = new WebSocket(import.meta.env.VITE_WHISPER_SERVER_URL)
+      // Create and configure the Whisper WebSocket via the socket handler
+      const socket = createWhisperSocket(session.access_token, {
+        onPartial: (incomingText, speaker) => {
+          // Build a preview by merging the current buffer with the incoming partial text
+          const preview = mergeChunk(sentenceBufferRef.current, incomingText)
+          if (speaker) sentenceSpeakerRef.current = speaker
+          setLiveText(preview)
+          setLiveSpeaker(speaker ?? sentenceSpeakerRef.current)
+        },
+        onFull: async (msg) => {
+          // Handles both auth_ok and AddTranscript messages
+          if (msg.message === 'auth_ok') {
+            await beginAudio()
+            return
+          }
+
+          // Full transcript handling (AddTranscript)
+          const results: SpeechmaticsResult[] = Array.isArray(msg.results)
+            ? msg.results
+            : []
+          const fallbackText = msg.metadata?.transcript?.trim() || ''
+          const text = buildTranscriptFromResults(results) || fallbackText
+          if (!text) return
+
+          const speaker = dominantSpeaker(results)
+          const startTime = msg.metadata?.start_time ?? 0
+          const endTime = msg.metadata?.end_time ?? startTime
+
+          if (sentenceStartRef.current === null) {
+            sentenceStartRef.current = startTime
+          }
+          if (speaker) sentenceSpeakerRef.current = speaker
+
+          sentenceBufferRef.current = mergeChunk(sentenceBufferRef.current, text)
+          setLiveText(sentenceBufferRef.current.trim())
+          setLiveSpeaker(sentenceSpeakerRef.current)
+
+          if (/[.!?]\s*$/.test(sentenceBufferRef.current.trim())) {
+            flushSentence(endTime)
+          }
+        },
+        onError: () => { void cleanup(); },
+        onClose: () => { void cleanup(); },
+      })
       socketRef.current = socket
 
       const beginAudio = async () => {
@@ -199,7 +241,9 @@ export function useWhisperStream() {
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
 
-        const blob = new Blob([VOW_PROCESSOR_CODE], { type: 'application/javascript' })
+        const blob = new Blob([VOW_PROCESSOR_CODE], {
+          type: 'application/javascript',
+        })
         const url = URL.createObjectURL(blob)
         await audioCtx.audioWorklet.addModule(url)
         URL.revokeObjectURL(url)
@@ -234,71 +278,6 @@ export function useWhisperStream() {
         setActive(true)
       }
 
-      socket.onopen = () => {
-        socket.send(JSON.stringify({ token: session.access_token }))
-      }
-
-      socket.onmessage = async (event) => {
-        if (!isActiveRef.current) return
-
-        try {
-          const data = JSON.parse(event.data as string)
-
-          if (data.message === 'auth_ok') {
-            await beginAudio()
-            return
-          }
-
-          const results: SpeechmaticsResult[] = Array.isArray(data?.results)
-            ? data.results
-            : []
-          const fallbackText = data?.metadata?.transcript?.trim() || ''
-          const text = buildTranscriptFromResults(results) || fallbackText
-          if (!text) return
-
-          const speaker = dominantSpeaker(results)
-
-          if (data.message === 'AddPartialTranscript') {
-            const preview = mergeChunk(sentenceBufferRef.current, text)
-            if (speaker) sentenceSpeakerRef.current = speaker
-            setLiveText(preview)
-            setLiveSpeaker(speaker ?? sentenceSpeakerRef.current)
-            return
-          }
-
-          if (data.message === 'AddTranscript') {
-            const startTime = data?.metadata?.start_time ?? 0
-            const endTime = data?.metadata?.end_time ?? startTime
-
-            if (sentenceStartRef.current === null) {
-              sentenceStartRef.current = startTime
-            }
-
-            if (speaker) sentenceSpeakerRef.current = speaker
-
-            sentenceBufferRef.current = mergeChunk(
-              sentenceBufferRef.current,
-              text,
-            )
-            setLiveText(sentenceBufferRef.current.trim())
-            setLiveSpeaker(sentenceSpeakerRef.current)
-
-            if (/[.!?]\s*$/.test(sentenceBufferRef.current.trim())) {
-              flushSentence(endTime)
-            }
-          }
-        } catch {
-          // ignore malformed packets
-        }
-      }
-
-      socket.onerror = () => {
-        void cleanup()
-      }
-
-      socket.onclose = () => {
-        void cleanup()
-      }
     },
     [cleanup, flushSentence, session?.access_token, source, stop],
   )

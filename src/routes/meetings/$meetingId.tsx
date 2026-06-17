@@ -1,9 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import {
-  getMeetingDetail,
-  type MeetingDetailLoaderData,
-} from '#/features/meetings/meetings.data'
+import { getMeetingDetail } from '#/features/meetings/meetings.data'
+import type { MeetingDetailLoaderData } from '#/features/meetings/meetings.data'
 import MeetingDetail from '#/features/meetings/MeetingDetailPage'
 import { supabase } from '#/lib/supabase'
 

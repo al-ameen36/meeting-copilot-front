@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Calendar, Clock, ChevronRight, LogOut } from 'lucide-react'
 import { supabase } from '#/lib/supabase'
-import type { Meeting } from '#/features/meetings/meetings.data'
+import type { Meeting } from '#/types/transcripts'
 
 // Component now receives `meetings` as a prop supplied by the route wrapper
 

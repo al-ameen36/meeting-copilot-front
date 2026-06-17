@@ -5,9 +5,6 @@ import { useState } from 'react'
 import { ChatPanel } from '#/features/chat/ChatPanel'
 import type { Meeting, Segment } from '#/types/transcripts'
 import { formatTime } from '#/lib/utils'
-import { StartButton } from '#/components/StartButton'
-
-// Component now receives `meeting` and `segments` as props supplied by the route wrapper
 
 function MeetingDetail({
   meeting,
