@@ -9,25 +9,14 @@ import {
   buildTranscriptFromResults,
   dominantSpeaker,
 } from './whisperHelpers'
+import { getAudioStreams, VOW_PROCESSOR_CODE } from './audioSetup'
 
-type AudioSource = 'mic' | 'tab'
-
-type TranscriptSegment = {
-  start: number
-  end: number
-  text: string
-  speaker?: string
-}
-
-type SpeechmaticsAlternative = {
-  content?: string
-  speaker?: string
-}
-
-type SpeechmaticsResult = {
-  type?: string
-  alternatives?: SpeechmaticsAlternative[]
-}
+import type {
+  AudioSource,
+  TranscriptSegment,
+  SpeechmaticsAlternative,
+  SpeechmaticsResult,
+} from './types'
 
 export function useWhisperStream() {
   const { session } = useAuth()
@@ -55,24 +44,6 @@ export function useWhisperStream() {
   const isActiveRef = useRef(false)
   const meetingIdRef = useRef<string | null>(null)
 
-  const getAudioStreams = async (selectedSource: AudioSource) => {
-    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-    if (selectedSource === 'mic') {
-      return { displayStream: null, micStream }
-    }
-
-    try {
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      })
-      return { displayStream, micStream }
-    } catch (err) {
-      console.warn('Display audio unavailable, using mic only:', err)
-      return { displayStream: null, micStream }
-    }
-  }
 
   const flushSentence = useCallback((endTime: number) => {
     let text = sentenceBufferRef.current.trim()
@@ -228,20 +199,7 @@ export function useWhisperStream() {
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
 
-        const workletCode = `
-          class VowProcessor extends AudioWorkletProcessor {
-            process(inputs) {
-              const input = inputs[0]
-              if (input && input[0] && input[0].length) {
-                this.port.postMessage(input[0].slice(0).buffer)
-              }
-              return true
-            }
-          }
-          registerProcessor('vow-processor', VowProcessor)
-        `
-
-        const blob = new Blob([workletCode], { type: 'application/javascript' })
+        const blob = new Blob([VOW_PROCESSOR_CODE], { type: 'application/javascript' })
         const url = URL.createObjectURL(blob)
         await audioCtx.audioWorklet.addModule(url)
         URL.revokeObjectURL(url)
