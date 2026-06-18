@@ -48,6 +48,7 @@ export function useWhisperStream() {
   const gainNodeRef = useRef<GainNode | null>(null)
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const inputNodesRef = useRef<AudioNode[]>([])
+  const recordingCtxRef = useRef<AudioContext | null>(null)
 
   const transcriptLinesRef = useRef<TranscriptSegment[]>([])
   const sentenceBufferRef = useRef('')
@@ -126,6 +127,9 @@ export function useWhisperStream() {
 
     try {
       await audioCtxRef.current?.close()
+    } catch {}
+    try {
+      await recordingCtxRef.current?.close()
     } catch {}
 
     displayStreamRef.current?.getTracks().forEach((t) => t.stop())
@@ -292,16 +296,10 @@ export function useWhisperStream() {
         micStreamRef.current = micStream
 
         // Build a single MediaStream for recording (audio + video tracks if present)
-        const tracks: MediaStreamTrack[] = []
-        micStream.getAudioTracks().forEach((t) => tracks.push(t))
-        if (displayStream) {
-          displayStream.getAudioTracks().forEach((t) => tracks.push(t))
-          displayStream.getVideoTracks().forEach((t) => tracks.push(t))
-        }
-        recordingStreamRef.current = new MediaStream(tracks)
-
+        // Create AudioContext first
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
+
 
         const blob = new Blob([VOW_PROCESSOR_CODE], {
           type: 'application/javascript',
@@ -326,7 +324,33 @@ export function useWhisperStream() {
           displaySource.connect(gainNode)
         }
 
+        // Connect gain node to the worklet for transcription processing only
         gainNode.connect(workletNode)
+
+        // --- Mix mic and tab audio at full quality for recording ---
+        // Create a separate AudioContext for recording (native sample rate)
+        const recordingCtx = new AudioContext()
+        recordingCtxRef.current = recordingCtx
+        const recordingDest = recordingCtx.createMediaStreamDestination()
+
+        // Mix mic audio
+        const recMicSource = recordingCtx.createMediaStreamSource(micStream)
+        recMicSource.connect(recordingDest)
+
+        // Mix tab audio if available
+        if (displayStream && displayStream.getAudioTracks().length > 0) {
+          const recDisplaySource = recordingCtx.createMediaStreamSource(displayStream)
+          recDisplaySource.connect(recordingDest)
+        }
+
+        // Build final recording MediaStream: mixed audio + video tracks from displayStream
+        const finalTracks: MediaStreamTrack[] = []
+        recordingDest.stream.getAudioTracks().forEach((t) => finalTracks.push(t))
+        if (displayStream) {
+          displayStream.getVideoTracks().forEach((t) => finalTracks.push(t))
+        }
+        recordingStreamRef.current = new MediaStream(finalTracks)
+
         workletNode.port.onmessage = (event) => {
           if (socket.readyState === WebSocket.OPEN && event.data?.byteLength) {
             socket.send(event.data)

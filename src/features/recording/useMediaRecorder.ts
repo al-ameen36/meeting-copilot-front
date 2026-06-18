@@ -12,17 +12,40 @@ export function useMediaRecorder() {
   // No need to keep recordedBlob in state; we resolve it via stop promise
 
 
-  const start = useCallback((stream: MediaStream) => {
-    let options = { mimeType: 'video/webm; codecs=vp9,opus' }
-    // Fallback to audio-only if the provided mime type is unsupported (e.g., audio‑only stream)
-    try {
-      // Attempt to create with video mime type – may throw InvalidStateError
-      // eslint-disable-next-line no-new
-      new MediaRecorder(stream, options)
-    } catch (e) {
-      console.warn('Video/webm mime type not supported, falling back to audio/webm', e)
-      options = { mimeType: 'audio/webm; codecs=opus' }
+  // Helper to pick a supported mime type that includes both video and audio.
+  const getSupportedMime = (stream: MediaStream) => {
+    const hasVideo = stream.getVideoTracks().length > 0
+    const hasAudio = stream.getAudioTracks().length > 0
+
+    const videoCandidates = [
+      'video/webm; codecs=vp9,opus',
+      'video/webm; codecs=vp8,opus',
+      'video/webm',
+    ]
+    const audioCandidates = [
+      'audio/webm; codecs=opus',
+      'audio/webm',
+    ]
+
+    if (hasVideo) {
+      for (const mime of videoCandidates) {
+        if (MediaRecorder.isTypeSupported(mime)) return { mime }
+      }
     }
+
+    if (hasAudio) {
+      for (const mime of audioCandidates) {
+        if (MediaRecorder.isTypeSupported(mime)) return { mime }
+      }
+    }
+
+    // Let the browser decide if none matched
+    return { mime: '' }
+  }
+
+  const start = useCallback((stream: MediaStream) => {
+    const { mime } = getSupportedMime(stream)
+    const options = { mimeType: mime }
     const recorder = new MediaRecorder(stream, options)
     recorderRef.current = recorder
     chunksRef.current = []
@@ -31,7 +54,6 @@ export function useMediaRecorder() {
     }
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: options.mimeType })
-      // No state needed; blob is resolved via stop promise
       setPlaybackUrl(URL.createObjectURL(blob))
       // Resolve any awaiting stop promise
       if (stopResolveRef.current) {
