@@ -42,7 +42,6 @@ export function useWhisperStream() {
   const {
     start: startRecording,
     stop: stopRecording,
-    recordedBlob,
     reset: resetRecording,
   } = useMediaRecorder()
   const gainNodeRef = useRef<GainNode | null>(null)
@@ -151,19 +150,22 @@ export function useWhisperStream() {
       flushSentence(fallbackEnd)
     }
 
-    // Stop the MediaRecorder (if it was started)
-    stopRecording()
+    // Capture meeting ID before cleanup clears it
+    const currentMeetingId = meetingIdRef.current
+
+    // Stop the MediaRecorder (if it was started) and await the blob
+    const blob = await stopRecording()
 
     socketRef.current?.close()
     await cleanup()
 
     // Persist the recorded blob to disk (if any)
-    if (recordedBlob && meetingIdRef.current) {
-      await saveRecordingToDisk(recordedBlob, meetingIdRef.current)
+    if (blob && currentMeetingId) {
+      await saveRecordingToDisk(blob, currentMeetingId)
       // Reset the recorder for the next meeting
       resetRecording()
     }
-  }, [cleanup, flushSentence, stopRecording, recordedBlob, resetRecording])
+  }, [cleanup, flushSentence, stopRecording, resetRecording])
 
   const start = useCallback(
     async (selectedSource: AudioSource = source) => {
