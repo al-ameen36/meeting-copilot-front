@@ -27,7 +27,10 @@ export function TranscriptDisplay({
         <motion.div className="absolute -top-1 -left-1 -right-1 -bottom-1 rounded-3xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 blur-xl" />
       )}
 
-      <div ref={scrollRef} className="relative w-full space-y-4">
+      <div
+        ref={scrollRef}
+        className="relative w-full space-y-4 max-h-[calc(100vh-240px)] overflow-y-auto"
+      >
         {!isListening && segments.length === 0 && !liveText ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-zinc-600 text-sm">Waiting for audio...</p>
