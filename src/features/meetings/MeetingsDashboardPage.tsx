@@ -1,51 +1,24 @@
-import { Link, useNavigate } from '@tanstack/react-router'
-import { Calendar, Clock, ChevronRight, LogOut } from 'lucide-react'
-import { supabase } from '#/lib/supabase'
+import { Link } from '@tanstack/react-router'
+import { Calendar, Clock, ChevronRight } from 'lucide-react'
 import type { Meeting } from '#/types/transcripts'
 import { formatDateTime, formatMonthAbbr } from '#/lib/utils'
-
-// Component now receives `meetings` as a prop supplied by the route wrapper
+import Header from '#/components/Header'
 
 function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
-  const navigate = useNavigate()
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    navigate({ to: '/login' })
-  }
-
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-5xl mx-auto space-y-8">
-        {/* Header / Navigate */}
-        <div className="flex items-center justify-between pb-6 border-b border-zinc-900">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-              Past Meetings
-            </h1>
-            <p className="text-zinc-500 text-sm mt-1">
-              Review your historical transcripts.
-            </p>
-          </div>
+    <div className="min-h-screen bg-black text-white p-6 relative">
+      {/* Header */}
+      <Header>
+        <Link
+          to="/"
+          className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-sm font-medium rounded-md transition-colors border border-zinc-800"
+          style={{ color: 'black' }}
+        >
+          Start New Meeting
+        </Link>
+      </Header>
 
-          <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-sm font-medium rounded-md transition-colors border border-zinc-800"
-              style={{ color: 'black' }}
-            >
-              Start New Meeting
-            </Link>
-
-            <button
-              onClick={handleSignOut}
-              className="p-2 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-md transition-all duration-200"
-              title="Sign Out"
-            >
-              <LogOut className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-
+      <div className="max-w-5xl mx-auto space-y-8 pt-20">
         {/* Meetings Grid */}
         {meetings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center bg-zinc-950 rounded-md border border-zinc-900">
@@ -91,9 +64,7 @@ function MeetingsDashboard({ meetings }: { meetings: Meeting[] }) {
                   <div className="flex items-center gap-4 text-xs text-zinc-500">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {formatDateTime(meeting.createdAt)}
-                      </span>
+                      <span>{formatDateTime(meeting.createdAt)}</span>
                     </div>
                   </div>
                 </Link>

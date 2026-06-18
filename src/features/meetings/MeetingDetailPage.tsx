@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { ChatPanel } from '#/features/chat/ChatPanel'
 import InsightCard from '#/components/InsightCard'
+import Header from '#/components/Header'
 import type { Meeting, Segment } from '#/types/transcripts'
 import { formatTime, formatDate, formatDateTime } from '#/lib/utils'
 
@@ -22,29 +23,25 @@ function MeetingDetail({
     <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* HEADER */}
-        <div className="fixed bg-zinc-900/60 backdrop-blur-sm z-1 top-0 left-0 right-0 px-6 pt-6 pb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Link
-                to="/meetings"
-                className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-4 text-sm font-medium"
-              >
-                <ArrowLeft className="w-6 h-6" />
-              </Link>
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">
-                {meeting.title || 'Untitled Session'}
-              </h1>
-              <div className="flex items-center gap-4 text-sm text-zinc-500">
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="w-4 h-4" />
-                  <span>{formatDate(meeting.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" />
-                  <span>{formatDateTime(meeting.createdAt)}</span>
-                </div>
+        <Header>
+          <Link
+            to="/meetings"
+            className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-4 text-sm font-medium"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">
+              {meeting.title || 'Untitled Session'}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-zinc-500">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4" />
+                <span>{formatDate(meeting.createdAt)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                <span>{formatDateTime(meeting.createdAt)}</span>
               </div>
             </div>
           </div>
@@ -55,7 +52,7 @@ function MeetingDetail({
             <MessageSquare className="w-4 h-4" />
             Ask Anything
           </button>
-        </div>
+        </Header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-30">
           <div className="space-y-4">
