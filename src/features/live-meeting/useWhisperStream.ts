@@ -1,4 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
+import { useMediaRecorder } from '#/features/recording/useMediaRecorder'
+import { saveRecordingToDisk } from '#/lib/recordingSaver'
+
 import { useAuth } from '#/features/auth/AuthContext'
 import { createMeeting, addSegment } from '#/lib/localdb/transcriptStore'
 
@@ -32,6 +35,16 @@ export function useWhisperStream() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const displayStreamRef = useRef<MediaStream | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
+  // Combined stream for local recording (audio + optional video)
+  const recordingStreamRef = useRef<MediaStream | null>(null)
+
+  // MediaRecorder hook – receives the combined stream (may be null initially)
+  const {
+    start: startRecording,
+    stop: stopRecording,
+    recordedBlob,
+    reset: resetRecording,
+  } = useMediaRecorder()
   const gainNodeRef = useRef<GainNode | null>(null)
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const inputNodesRef = useRef<AudioNode[]>([])
@@ -130,7 +143,7 @@ export function useWhisperStream() {
     setActive(false)
   }, [])
 
-  const stop = useCallback(() => {
+  const stop = useCallback(async () => {
     const fallbackEnd =
       sentenceStartRef.current ?? transcriptLinesRef.current.at(-1)?.end ?? 0
 
@@ -138,9 +151,19 @@ export function useWhisperStream() {
       flushSentence(fallbackEnd)
     }
 
+    // Stop the MediaRecorder (if it was started)
+    stopRecording()
+
     socketRef.current?.close()
-    void cleanup()
-  }, [cleanup, flushSentence])
+    await cleanup()
+
+    // Persist the recorded blob to disk (if any)
+    if (recordedBlob && meetingIdRef.current) {
+      await saveRecordingToDisk(recordedBlob, meetingIdRef.current)
+      // Reset the recorder for the next meeting
+      resetRecording()
+    }
+  }, [cleanup, flushSentence, stopRecording, recordedBlob, resetRecording])
 
   const start = useCallback(
     async (selectedSource: AudioSource = source) => {
@@ -203,7 +226,10 @@ export function useWhisperStream() {
           }
           if (speaker) sentenceSpeakerRef.current = speaker
 
-          sentenceBufferRef.current = mergeChunk(sentenceBufferRef.current, text)
+          sentenceBufferRef.current = mergeChunk(
+            sentenceBufferRef.current,
+            text,
+          )
           setLiveText(sentenceBufferRef.current.trim())
           setLiveSpeaker(sentenceSpeakerRef.current)
 
@@ -211,8 +237,12 @@ export function useWhisperStream() {
             flushSentence(endTime)
           }
         },
-        onError: () => { void cleanup(); },
-        onClose: () => { void cleanup(); },
+        onError: () => {
+          void cleanup()
+        },
+        onClose: () => {
+          void cleanup()
+        },
       })
       socketRef.current = socket
 
@@ -237,6 +267,15 @@ export function useWhisperStream() {
 
         displayStreamRef.current = displayStream
         micStreamRef.current = micStream
+
+        // Build a single MediaStream for recording (audio + video tracks if present)
+        const tracks: MediaStreamTrack[] = []
+        micStream.getAudioTracks().forEach((t) => tracks.push(t))
+        if (displayStream) {
+          displayStream.getAudioTracks().forEach((t) => tracks.push(t))
+          displayStream.getVideoTracks().forEach((t) => tracks.push(t))
+        }
+        recordingStreamRef.current = new MediaStream(tracks)
 
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
@@ -276,8 +315,9 @@ export function useWhisperStream() {
         }
 
         setActive(true)
+        // Start recording now that we have the combined MediaStream
+        startRecording(recordingStreamRef.current)
       }
-
     },
     [cleanup, flushSentence, session?.access_token, source, stop],
   )

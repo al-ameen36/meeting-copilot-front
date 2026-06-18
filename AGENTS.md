@@ -122,6 +122,8 @@
 
 7. **`InsightFilter.tsx` is unused** — File exists at `src/components/InsightFilter.tsx` but is never imported. The live page uses inline filter buttons instead.
 
+8. **TypeScript error fixed** — `useWhisperStream` now correctly passes the combined `MediaStream` to `startRecording`, resolving the previous TS2554 error.
+
 ---
 
 ## Architecture Diagram
