@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useMediaRecorder } from '#/features/recording/useMediaRecorder'
-import { saveRecordingToDisk, saveMeetingPackage } from '#/lib/recordingSaver'
-import { generateVtt } from '#/lib/subtitles'
+import { saveMeetingPackage, saveRecordingToDisk } from '#/lib/recordingSaver'
 
 import { useAuth } from '#/features/auth/AuthContext'
 import { createMeeting, addSegment } from '#/lib/localdb/transcriptStore'
@@ -21,6 +20,7 @@ import type {
   TranscriptSegment,
   SpeechmaticsResult,
 } from './types'
+import { generateSrt } from '#/lib/subtitles'
 
 export function useWhisperStream() {
   const { session } = useAuth()
@@ -166,11 +166,11 @@ export function useWhisperStream() {
 
     // Persist the recorded blob to disk (if any)
     if (blob && currentMeetingId) {
-      // Generate WebVTT subtitles from transcript segments
+      // Generate SRT subtitles from transcript segments
       let subtitleBlob: Blob | null = null
       try {
-        const vttContent = generateVtt(transcriptLinesRef.current)
-        subtitleBlob = new Blob([vttContent], { type: 'text/vtt' })
+        const srtContent = generateSrt(transcriptLinesRef.current)
+        subtitleBlob = new Blob([srtContent], { type: 'application/x-subrip' })
       } catch (e) {
         console.warn('Failed to generate subtitles', e)
       }
@@ -227,7 +227,8 @@ export function useWhisperStream() {
           if (msg.message === 'auth_ok') {
             // Prefer the meeting ID supplied by the backend (racy‑free).
             // The server may include it as `meeting_id` or `meetingId`.
-            const serverId = (msg as any).meeting_id ?? (msg as any).meetingId ?? null
+            const serverId =
+              (msg as any).meeting_id ?? (msg as any).meetingId ?? null
             if (serverId) {
               meetingIdRef.current = serverId
               setMeetingId(serverId)
@@ -300,7 +301,6 @@ export function useWhisperStream() {
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
 
-
         const blob = new Blob([VOW_PROCESSOR_CODE], {
           type: 'application/javascript',
         })
@@ -339,13 +339,16 @@ export function useWhisperStream() {
 
         // Mix tab audio if available
         if (displayStream && displayStream.getAudioTracks().length > 0) {
-          const recDisplaySource = recordingCtx.createMediaStreamSource(displayStream)
+          const recDisplaySource =
+            recordingCtx.createMediaStreamSource(displayStream)
           recDisplaySource.connect(recordingDest)
         }
 
         // Build final recording MediaStream: mixed audio + video tracks from displayStream
         const finalTracks: MediaStreamTrack[] = []
-        recordingDest.stream.getAudioTracks().forEach((t) => finalTracks.push(t))
+        recordingDest.stream
+          .getAudioTracks()
+          .forEach((t) => finalTracks.push(t))
         if (displayStream) {
           displayStream.getVideoTracks().forEach((t) => finalTracks.push(t))
         }
