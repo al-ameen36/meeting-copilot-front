@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import { useMediaRecorder } from '#/features/recording/useMediaRecorder'
-import { saveRecordingToDisk } from '#/lib/recordingSaver'
+import { saveRecordingToDisk, saveMeetingPackage } from '#/lib/recordingSaver'
+import { generateVtt } from '#/lib/subtitles'
 
 import { useAuth } from '#/features/auth/AuthContext'
 import { createMeeting, addSegment } from '#/lib/localdb/transcriptStore'
@@ -161,7 +162,20 @@ export function useWhisperStream() {
 
     // Persist the recorded blob to disk (if any)
     if (blob && currentMeetingId) {
-      await saveRecordingToDisk(blob, currentMeetingId)
+      // Generate WebVTT subtitles from transcript segments
+      let subtitleBlob: Blob | null = null
+      try {
+        const vttContent = generateVtt(transcriptLinesRef.current)
+        subtitleBlob = new Blob([vttContent], { type: 'text/vtt' })
+      } catch (e) {
+        console.warn('Failed to generate subtitles', e)
+      }
+      if (subtitleBlob) {
+        await saveMeetingPackage(blob, subtitleBlob, currentMeetingId)
+      } else {
+        // Fallback: just save video if subtitle generation failed
+        await saveRecordingToDisk(blob, currentMeetingId)
+      }
       // Reset the recorder for the next meeting
       resetRecording()
     }
