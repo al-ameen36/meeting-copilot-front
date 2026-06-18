@@ -7,10 +7,16 @@ type ChatMessage = {
   content: string
 }
 
+type ContextChunk = {
+  id: string
+  start: number
+  text: string
+}
+
 type ChatRequestBody = {
   query: string
   history: Array<ChatMessage>
-  context_chunks?: Array<{ id: string; start: number; text: string }>
+  context_chunks?: ContextChunk[]
 }
 
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -76,7 +82,7 @@ const parseChatBody = (value: unknown): ChatRequestBody | null => {
   }
 
   // optional context_chunks validation
-  const maybeChunks = (maybeBody as any).context_chunks
+  const maybeChunks = maybeBody.context_chunks
   if (maybeChunks !== undefined) {
     if (!Array.isArray(maybeChunks)) return null
     for (const c of maybeChunks) {

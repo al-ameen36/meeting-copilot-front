@@ -68,9 +68,9 @@ export function useMediaRecorder() {
   const stopPromiseRef = useRef<Promise<Blob> | null>(null)
   const stopResolveRef = useRef<((blob: Blob) => void) | null>(null)
 
-  const stop = useCallback(() => {
+  const stop = useCallback((): Promise<Blob | null> => {
     if (!recorderRef.current) {
-      return Promise.resolve(null as any)
+      return Promise.resolve(null)
     }
     // Create a promise that resolves on the "stop" event
     stopPromiseRef.current = new Promise<Blob>((resolve) => {
