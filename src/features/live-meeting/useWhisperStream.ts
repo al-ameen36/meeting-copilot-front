@@ -205,6 +205,13 @@ export function useWhisperStream() {
         onFull: async (msg) => {
           // Handles both auth_ok and AddTranscript messages
           if (msg.message === 'auth_ok') {
+            // Prefer the meeting ID supplied by the backend (racy‑free).
+            // The server may include it as `meeting_id` or `meetingId`.
+            const serverId = (msg as any).meeting_id ?? (msg as any).meetingId ?? null
+            if (serverId) {
+              meetingIdRef.current = serverId
+              setMeetingId(serverId)
+            }
             await beginAudio()
             return
           }

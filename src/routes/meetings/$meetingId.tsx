@@ -6,8 +6,8 @@ import { requireAuth } from '#/lib/authHelpers'
 
 export const Route = createFileRoute('/meetings/$meetingId')({
   component: function MeetingDetailWrapper() {
-    const { meeting, segments, insights } = Route.useLoaderData()
-    return <MeetingDetail meeting={meeting} segments={segments} insights={insights} />
+    const { meeting, segments } = Route.useLoaderData()
+    return <MeetingDetail meeting={meeting} segments={segments} />
   },
   loader: async ({ params }): Promise<MeetingDetailLoaderData> => {
     await requireAuth()

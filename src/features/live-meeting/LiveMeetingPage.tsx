@@ -7,10 +7,13 @@ import { useAuth } from '#/features/auth/AuthContext'
 import { useNetwork } from '#/hooks/use-network'
 
 import { TranscriptDisplay } from '#/features/transcript/TranscriptDisplay'
-import { SourceSelector } from '#/components/SourceSelector'
-import { StartButton } from '#/components/StartButton'
+import {
+  SourceSelector,
+  StartButton,
+  Header,
+} from '#/features/_internal/aliases'
 import { ChatPanel } from '#/features/chat/ChatPanel'
-import Header from '#/components/Header'
+import { cn } from '#/lib/utils'
 
 export default function LiveMeetingPage() {
   const navigate = useNavigate()
@@ -76,15 +79,17 @@ export default function LiveMeetingPage() {
             disabled={!isOnline || disableRecBtn}
           />
           <SourceSelector selectedSource={source} onSourceChange={setSource} />
-          {meetingId && (
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="w-9 h-9 rounded-full transition-all duration-300 shadow-lg flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium"
-              title="Chat with Meeting"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className={cn(
+              'w-9 h-9 rounded-full transition-all duration-300 shadow-lg flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium',
+              meetingId ? 'opacity-100' : 'opacity-50 cursor-not-allowed',
+            )}
+            title="Chat with Meeting"
+            disabled={!meetingId}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

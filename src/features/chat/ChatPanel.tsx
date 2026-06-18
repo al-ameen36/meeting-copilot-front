@@ -155,7 +155,7 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
 
       {/* Slide-over panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[400px] bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        className={`fixed top-0 right-0 h-full sm:w-[400px] bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -173,7 +173,7 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
+        <div className="h-[calc(100vh-150px)] p-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-50">
               <Bot className="w-12 h-12 text-zinc-500" />
@@ -219,7 +219,7 @@ export function ChatPanel({ isOpen, onClose, meetingId }: ChatPanelProps) {
         </div>
 
         {/* Input Form */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950">
+        <div className="p-4 bg-zinc-950">
           <form onSubmit={handleSubmit} className="relative flex items-center">
             <input
               type="text"

@@ -13,3 +13,9 @@ export type Segment = {
   start: number
   speaker?: string
 }
+export type Insight = {
+  id: string
+  type: string
+  text: string
+  timestamp?: number
+}
