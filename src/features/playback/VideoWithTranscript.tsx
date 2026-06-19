@@ -13,6 +13,7 @@ export function VideoWithTranscript() {
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [segments, setSegments] = useState<Segment[]>([])
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
+  const [search, setSearch] = useState<string>('')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Video file selector – creates a blob URL for playback
@@ -120,34 +121,55 @@ export function VideoWithTranscript() {
           </div>
         </div>
         {/* Right column – transcript list */}
-        <div className="w-1/3 overflow-y-auto max-h-[calc(100vh-160px)] border border-zinc-700 rounded-md bg-zinc-800/60 p-3">
-          {segments.map((seg, idx) => (
-            <button
-              type="button"
-              id={`segment-${idx}`}
-              key={idx}
-              onClick={() => handleSegmentClick(seg.start)}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-md mb-2 transition-colors duration-200',
-                idx === activeIdx
-                  ? 'bg-cyan-900/60 ring-1 ring-cyan-500/50'
-                  : 'hover:bg-zinc-700/40',
-              )}
-            >
-              <div className="text-xs text-gray-400 mb-1">
-                {formatTime(seg.start)}
-              </div>
-              <div className="text-sm text-gray-100 whitespace-pre-wrap">
-                {seg.text}
-              </div>
-            </button>
-          ))}
-          {segments.length === 0 && (
-            <p className="text-center text-zinc-500 mt-8">
-              Upload a video and a subtitle file to view the synchronized
-              transcript.
-            </p>
-          )}
+        {/* Right column – transcript list */}
+        <div className="w-1/3 flex flex-col max-h-[calc(100vh-160px)] border border-zinc-700 rounded-md bg-zinc-800/60">
+          {/* Search input – stays fixed at top */}
+          <div className="p-3 pb-2 border-b border-zinc-700">
+            <input
+              type="text"
+              placeholder="Search transcript..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full p-1 border border-zinc-600 rounded bg-zinc-900 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          {/* Segment list – scrolls independently */}
+          <div className="flex-1 overflow-y-auto p-3">
+            {segments.map((seg, idx) => {
+              const matchesSearch =
+                !search || seg.text.toLowerCase().includes(search.toLowerCase())
+              if (!matchesSearch) return null
+              return (
+                <button
+                  type="button"
+                  id={`segment-${idx}`}
+                  key={idx}
+                  onClick={() => handleSegmentClick(seg.start)}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-md mb-2 transition-colors duration-200',
+                    idx === activeIdx
+                      ? 'bg-cyan-900/60 ring-1 ring-cyan-500/50'
+                      : 'hover:bg-zinc-700/40',
+                  )}
+                >
+                  <div className="text-xs text-gray-400 mb-1">
+                    {formatTime(seg.start)}
+                  </div>
+                  <div className="text-sm text-gray-100 whitespace-pre-wrap">
+                    {seg.text}
+                  </div>
+                </button>
+              )
+            })}
+
+            {segments.length === 0 && (
+              <p className="text-center text-zinc-500 mt-8">
+                Upload a video and a subtitle file to view the synchronized
+                transcript.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </>
