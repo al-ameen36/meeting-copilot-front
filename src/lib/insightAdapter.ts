@@ -18,11 +18,11 @@ export async function getInsights(meetingId: string): Promise<Insight[]> {
   }
 
   // Ensure timestamps are numbers (seconds) – Supabase may return strings.
-  return (data ?? []).map((insight) => ({
+  return data.map((insight) => ({
     id: insight.id,
     type: insight.type,
     text: insight.text,
     // Some rows may lack timestamp; keep undefined if null/undefined.
     timestamp: insight.timestamp ? Number(insight.timestamp) : undefined,
-  })) as Insight[]
+  }))
 }

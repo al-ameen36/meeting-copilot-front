@@ -1,24 +1,24 @@
 /**
  * Utility for saving meeting recordings.
- * Uses a simple download link for the video and optionally bundles video + subtitles into a zip.
+ * Downloads the video alone, or bundles video + subtitles into a zip.
  */
 import JSZip from 'jszip'
 
-/** Save a single video recording – fallback download */
-export async function saveRecordingToDisk(blob: Blob, meetingId: string) {
-  const fileName = `meeting-${meetingId}.webm`
+function triggerDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = fileName
-  a.style.display = 'none'
-  document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
 
-/** Save both video and subtitle as a zip archive */
+/** Save a single video recording */
+export function saveRecordingToDisk(blob: Blob, meetingId: string) {
+  triggerDownload(blob, `meeting-${meetingId}.webm`)
+}
+
+/** Save video and subtitles bundled as a zip archive */
 export async function saveMeetingPackage(
   videoBlob: Blob,
   subtitleBlob: Blob,
@@ -26,16 +26,7 @@ export async function saveMeetingPackage(
 ) {
   const zip = new JSZip()
   zip.file(`meeting-${meetingId}.webm`, videoBlob)
-  zip.file(`meeting-${meetingId}.vtt`, subtitleBlob)
+  zip.file(`meeting-${meetingId}.srt`, subtitleBlob)
   const zipBlob = await zip.generateAsync({ type: 'blob' })
-  const zipName = `meeting-${meetingId}.zip`
-  const url = URL.createObjectURL(zipBlob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = zipName
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  triggerDownload(zipBlob, `meeting-${meetingId}.zip`)
 }
