@@ -1,4 +1,4 @@
-# Meeting Copilot — Frontend Codebase Guide
+# Meeting Copilot - Frontend Codebase Guide
 
 ## Stack
 
@@ -20,6 +20,7 @@
 | `/login`                        | `src/routes/login.tsx`                       | Email/password login + signup via Supabase Auth                |
 | `/meetings`                     | `src/routes/meetings/index.tsx`              | **Past Meetings** dashboard — grid of cards                    |
 | `/meetings/$meetingId`          | `src/routes/meetings/$meetingId.tsx`         | **Meeting detail** — transcript, insights, chat                |
+| `/playback`                     | `src/routes/playback.tsx`                    | **Video Playback** — upload video + SRT/VTT, synced transcript with searchable, sticky UI |
 | `/api/meetings/$meetingId/chat` | `src/routes/api/meetings/$meetingId/chat.ts` | **Server route** — proxies chat queries to backend             |
 
 ---
@@ -34,42 +35,52 @@
 - Receives JSON messages over WS: `auth_ok`, `AddTranscript`, `AddPartialTranscript`, `Insight`.
 - Handles partial transcripts, sentence completion (heuristic: ends with `.!?` or chunk >= 80 chars), and overlap removal.
 - Creates a meeting in Supabase when the backend sends `auth_ok`.
-- UI: scrolling transcript with "Live" indicator, real-time insights with type-based filters.
+- UI: scrolling transcript with "Live" indicator, real-time insights with type‑based filters.
 - Auth guard on client side: redirects unauthenticated users to `/login`.
 
 ### 2. Meeting Detail (`/meetings/$meetingId`)
 
-- Server-side loader fetches meeting, segments, and insights from Supabase.
+- Server‑side loader fetches meeting, segments, and insights from Supabase.
 - Displays timestamped transcript segments in a scrollable pane.
 - Displays filtered insights (important: `action_item`/`decision`/`risk`; general: `follow_up`/`update`).
-- "Chat with Meeting" button opens a slide-over panel.
+- "Chat with Meeting" button opens a slide‑over panel.
 - **Insights array is currently always empty** — the Supabase query for insights is commented out (the filter column was wrong).
 
 ### 3. Past Meetings Dashboard (`/meetings`)
 
-- Server-side loader fetches all meetings from Supabase, ordered by `created_at`.
+- Server‑side loader fetches all meetings from Supabase, ordered by `created_at`.
 - Grid of cards with title, date, duration, and links to detail page.
 - "Start New Meeting" link navigates to `/` (live page).
-- Sign-out button.
+- Sign‑out button.
 
 ### 4. Chat with Meeting
 
-- Slide-over panel (`ChatPanel`) with message history.
+- Slide‑over panel (`ChatPanel`) with message history.
 - Sends POST to `/api/meetings/$meetingId/chat` (server proxy → backend `/meetings/:id/chat`).
-- Supports **SSE streaming** — reads response body chunk-by-chunk for streaming assistant responses.
+- Supports **SSE streaming** — reads response body chunk‑by‑chunk for streaming assistant responses.
 - Renders assistant replies with `ReactMarkdown`.
 
 ### 5. Authentication
 
 - `AuthProvider` wraps the app, syncs Supabase session via `onAuthStateChange`.
-- Server-side route loaders check `supabase.auth.getSession()` and redirect to `/login`.
+- Server‑side route loaders check `supabase.auth.getSession()` and redirect to `/login`.
 - Network availability indicator (red banner when offline).
 
 ### 6. Audio Pipeline
 
 - `useWhisperStream` hook manages `AudioContext`, `AudioWorklet`, and WebSocket.
-- Audio is chunked (16kHz sample rate) and streamed to a Whisper-like backend.
-- Insights injected into UI in real-time as they arrive from the WS stream.
+- Audio is chunked (16kHz sample rate) and streamed to a Whisper‑like backend.
+- Insights injected into UI in real‑time as they arrive from the WS stream.
+
+### 7. Video Playback (`/playback`)
+
+- Users upload a **video file** and a **subtitle file** (SRT or VTT) separately.
+- Subtitles are parsed into `{ start, end, text }` segments.
+- The video plays on the left; the transcript list appears on the right.
+- **Sticky Search Bar**: stays visible while scrolling, allowing instant filtering of transcript lines.
+- Clicking a transcript line seeks the video to that timestamp.
+- Active segment is highlighted and auto‑scrolled into view during playback.
+- Layout uses flex columns with proper overflow handling to prevent UI overflow.
 
 ---
 
@@ -93,8 +104,8 @@
 | `src/features/chat/chat.server.ts`                  | Shared server-side chat parsing utilities               |
 | `src/components/StartButton.tsx`                    | Record/stop button with pulse animation                 |
 | `src/components/SourceSelector.tsx`                 | Mic vs. Tab source selector                             |
-| `src/components/InsightFilter.tsx`                  | (exists but unused — live page uses inline filters)     |
-| `src/hooks/use-network.tsx`                         | `useNetwork()` — online/offline detection               |
+| `src/components/InsightFilter.tsx`                  | (exists but unused - live page uses inline filters)     |
+| `src/hooks/use-network.tsx`                         | `useNetwork()` - online/offline detection               |
 | `src/types/transcripts.ts`                          | Shared `Meeting`, `Insight`, `Segment` types            |
 | `src/integrations/tanstack-query/root-provider.tsx` | QueryClient context provider                            |
 | `src/integrations/tanstack-query/devtools.tsx`      | React Query Devtools integration                        |
@@ -105,24 +116,24 @@
 
 1. **Insights never load.** Both `meetings.data.ts` and the detail page loader return `insights: []`. The detail page has the insights Supabase query commented out because the `segment_id` filter column was wrong.
 
-2. **Import path mismatches** — Several files import from wrong paths:
+2. **Import path mismatches** - Several files import from wrong paths:
    - `LiveMeetingPage.tsx` imports `useWhisperStream` from `#/hooks/use-stream` → should be `#/features/live-meeting/useWhisperStream`
    - `LiveMeetingPage.tsx`, `MeetingDetailPage.tsx` import `TranscriptDisplay` from `#/components/TranscriptDisplay` → should be `#/features/transcript/TranscriptDisplay`
    - `LiveMeetingPage.tsx`, `MeetingDetailPage.tsx` import `ChatPanel` from `#/components/ChatPanel` → should be `#/features/chat/ChatPanel`
    - `LiveMeetingPage.tsx` imports `InsightCard` from `#/components/InsightCard` → file doesn't exist (only in features)
    - `__root.tsx` imports `AuthProvider` from `#/contexts/AuthContext` → should be `#/features/auth/AuthContext`
 
-3. **`InsightCard` component is missing** — No file at `components/InsightCard.tsx`. Needs to be created to display individual insights.
+3. **`InsightCard` component is missing** - No file at `components/InsightCard.tsx`. Needs to be created to display individual insights.
 
-4. **Duplicate route definitions** — `meetings/index.tsx` and `meetings/$meetingId.tsx` both re-declare routes with `createFileRoute` while `routeTree.gen.ts` already has them. This suggests manual files were written after codegen, or the generator isn't in sync.
+4. **Duplicate route definitions** - `meetings/index.tsx` and `meetings/$meetingId.tsx` both re-declare routes with `createFileRoute` while `routeTree.gen.ts` already has them. This suggests manual files were written after codegen, or the generator isn't in sync.
 
-5. **Fragile meeting ID retrieval** — On WS `auth_ok`, the frontend fetches the latest meeting by `created_at`. This is racy if multiple meetings are created simultaneously.
+5. **Fragile meeting ID retrieval** - On WS `auth_ok`, the frontend fetches the latest meeting by `created_at`. This is racy if multiple meetings are created simultaneously.
 
-6. **SSR auth in loaders** — Server-side route loaders use `supabase.auth.getSession()` directly, which may not work properly for SSR since auth cookies aren't automatically passed through.
+6. **SSR auth in loaders** - Server-side route loaders use `supabase.auth.getSession()` directly, which may not work properly for SSR since auth cookies aren't automatically passed through.
 
-7. **`InsightFilter.tsx` is unused** — File exists at `src/components/InsightFilter.tsx` but is never imported. The live page uses inline filter buttons instead.
+7. **`InsightFilter.tsx` is unused** - File exists at `src/components/InsightFilter.tsx` but is never imported. The live page uses inline filter buttons instead.
 
-8. **TypeScript error fixed** — `useWhisperStream` now correctly passes the combined `MediaStream` to `startRecording`, resolving the previous TS2554 error.
+8. **TypeScript error fixed** - `useWhisperStream` now correctly passes the combined `MediaStream` to `startRecording`, resolving the previous TS2554 error.
 
 ---
 
@@ -161,7 +172,7 @@ Frontend (TanStack Start / Vite)
 
 ## Dev Notes
 
-- **Codegen:** Run `pnpm dev` — TanStack Router's Vite plugin auto-generates `src/routeTree.gen.ts`. Do not edit this file manually.
+- **Codegen:** Run `pnpm dev` - TanStack Router's Vite plugin auto-generates `src/routeTree.gen.ts`. Do not edit this file manually.
 - **Paths:** Uses `#/*` → `./src/*` import alias (defined in `package.json` `imports` field).
 - **Env vars:** See `.env.example`. Required: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_WHISPER_SERVER_URL`.
 - **Backend:** The Whisper server runs separately (default `localhost:8000`). It handles real-time transcription and insight extraction.
