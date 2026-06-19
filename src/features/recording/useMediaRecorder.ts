@@ -11,7 +11,6 @@ export function useMediaRecorder() {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
   // No need to keep recordedBlob in state; we resolve it via stop promise
 
-
   // Helper to pick a supported mime type that includes both video and audio.
   const getSupportedMime = (stream: MediaStream) => {
     const hasVideo = stream.getVideoTracks().length > 0
@@ -22,10 +21,7 @@ export function useMediaRecorder() {
       'video/webm; codecs=vp8,opus',
       'video/webm',
     ]
-    const audioCandidates = [
-      'audio/webm; codecs=opus',
-      'audio/webm',
-    ]
+    const audioCandidates = ['audio/webm; codecs=opus', 'audio/webm']
 
     if (hasVideo) {
       for (const mime of videoCandidates) {

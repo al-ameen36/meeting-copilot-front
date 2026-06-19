@@ -102,7 +102,9 @@ export const buildTranscriptFromResults = (
   return cleanText(text)
 }
 
-export const dominantSpeaker = (results: { type?: string; alternatives?: { speaker?: string }[] }[]): string | null => {
+export const dominantSpeaker = (
+  results: { type?: string; alternatives?: { speaker?: string }[] }[],
+): string | null => {
   const counts: Record<string, number> = {}
 
   for (const result of results) {

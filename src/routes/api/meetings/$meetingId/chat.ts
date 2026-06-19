@@ -86,7 +86,7 @@ const parseChatBody = (value: unknown): ChatRequestBody | null => {
   if (maybeChunks !== undefined) {
     if (!Array.isArray(maybeChunks)) return null
     for (const c of maybeChunks) {
-      if (!c || typeof c !== 'object') return null
+      if (typeof c !== 'object') return null
       if (typeof c.id !== 'string') return null
       if (typeof c.start !== 'number') return null
       if (typeof c.text !== 'string') return null

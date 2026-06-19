@@ -83,7 +83,6 @@ function MeetingDetail({
           </div>
         </div>
 
-
         <ChatPanel
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}

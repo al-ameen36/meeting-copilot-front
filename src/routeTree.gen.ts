@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlaybackRouteImport } from './routes/playback'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MeetingsIndexRouteImport } from './routes/meetings/index'
 import { Route as MeetingsMeetingIdRouteImport } from './routes/meetings/$meetingId'
 import { Route as ApiMeetingsMeetingIdChatRouteImport } from './routes/api/meetings/$meetingId/chat'
 
+const PlaybackRoute = PlaybackRouteImport.update({
+  id: '/playback',
+  path: '/playback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -45,6 +51,7 @@ const ApiMeetingsMeetingIdChatRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/playback': typeof PlaybackRoute
   '/meetings/$meetingId': typeof MeetingsMeetingIdRoute
   '/meetings/': typeof MeetingsIndexRoute
   '/api/meetings/$meetingId/chat': typeof ApiMeetingsMeetingIdChatRoute
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/playback': typeof PlaybackRoute
   '/meetings/$meetingId': typeof MeetingsMeetingIdRoute
   '/meetings': typeof MeetingsIndexRoute
   '/api/meetings/$meetingId/chat': typeof ApiMeetingsMeetingIdChatRoute
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/playback': typeof PlaybackRoute
   '/meetings/$meetingId': typeof MeetingsMeetingIdRoute
   '/meetings/': typeof MeetingsIndexRoute
   '/api/meetings/$meetingId/chat': typeof ApiMeetingsMeetingIdChatRoute
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/playback'
     | '/meetings/$meetingId'
     | '/meetings/'
     | '/api/meetings/$meetingId/chat'
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/playback'
     | '/meetings/$meetingId'
     | '/meetings'
     | '/api/meetings/$meetingId/chat'
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/login'
+    | '/playback'
     | '/meetings/$meetingId'
     | '/meetings/'
     | '/api/meetings/$meetingId/chat'
@@ -91,6 +103,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  PlaybackRoute: typeof PlaybackRoute
   MeetingsMeetingIdRoute: typeof MeetingsMeetingIdRoute
   MeetingsIndexRoute: typeof MeetingsIndexRoute
   ApiMeetingsMeetingIdChatRoute: typeof ApiMeetingsMeetingIdChatRoute
@@ -98,6 +111,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/playback': {
+      id: '/playback'
+      path: '/playback'
+      fullPath: '/playback'
+      preLoaderRoute: typeof PlaybackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -139,6 +159,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  PlaybackRoute: PlaybackRoute,
   MeetingsMeetingIdRoute: MeetingsMeetingIdRoute,
   MeetingsIndexRoute: MeetingsIndexRoute,
   ApiMeetingsMeetingIdChatRoute: ApiMeetingsMeetingIdChatRoute,

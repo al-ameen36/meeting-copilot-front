@@ -10,7 +10,9 @@ import type { Session } from '@supabase/supabase-js'
  * In environments where the cookie name differs or additional tokens are needed,
  * adjust the parsing logic accordingly.
  */
-export async function getSessionFromRequest(request: Request): Promise<Session | null> {
+export async function getSessionFromRequest(
+  request: Request,
+): Promise<Session | null> {
   try {
     const cookieHeader = request.headers.get('cookie') || ''
     const cookies = Object.fromEntries(
@@ -19,10 +21,14 @@ export async function getSessionFromRequest(request: Request): Promise<Session |
         return [key, rest.join('=')]
       }),
     )
-    const accessToken = cookies['sb-access-token'] || cookies['supabase-auth-token']
+    const accessToken =
+      cookies['sb-access-token'] || cookies['supabase-auth-token']
     if (accessToken) {
       // Set token for this client instance
-      await supabase.auth.setSession({ access_token: accessToken, refresh_token: '' })
+      await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: '',
+      })
     }
     const { data } = await supabase.auth.getSession()
     return data.session ?? null

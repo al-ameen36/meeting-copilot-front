@@ -17,14 +17,14 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [sessionState, setSessionState] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { isOnline, mounted } = useNetwork()
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
+      setSessionState(session)
       setUser(session?.user ?? null)
     })
 
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+      setSessionState(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
     })
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading }}>
+    <AuthContext.Provider value={{ user, session: sessionState, isLoading }}>
       {mounted && !isOnline && (
         <div className="bg-red-500 text-white text-center">
           Connect to the internet to continue

@@ -4,7 +4,10 @@ import {
   getMeeting,
 } from '#/lib/localdb/transcriptStore'
 
-import type { Meeting as StoredMeeting, Segment as StoredSegment } from '#/lib/localdb/transcriptStore'
+import type {
+  Meeting as StoredMeeting,
+  Segment as StoredSegment,
+} from '#/lib/localdb/transcriptStore'
 import type { Meeting, Segment } from '#/types/transcripts'
 
 export type MeetingDetailLoaderData = {
@@ -35,11 +38,11 @@ export async function getMeetingDetail(
   if (!stored) throw new Error('Meeting not found')
 
   const meeting = mapMeeting(stored)
-  const segments = (await getSegments(meetingId)) as StoredSegment[]
+  const segments = await getSegments(meetingId)
 
   return {
     meeting,
-    segments: segments as Array<Segment>,
+    segments: segments,
   }
 }
 

@@ -12,12 +12,12 @@ function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const handleAuth = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
+    setErrorMessage(null)
 
     try {
       if (isSignUp) {
@@ -37,7 +37,7 @@ function Login() {
         navigate({ to: '/' })
       }
     } catch (err: any) {
-      setError(isSignUp ? 'Signup Failed' : 'Login failed')
+      setErrorMessage(isSignUp ? 'Signup Failed' : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -58,9 +58,9 @@ function Login() {
             </p>
           </div>
 
-          {error && (
+          {errorMessage && (
             <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-md mb-6">
-              <p className="text-red-400 text-sm text-center">{error}</p>
+              <p className="text-red-400 text-sm text-center">{errorMessage}</p>
             </div>
           )}
 

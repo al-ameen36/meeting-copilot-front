@@ -112,14 +112,24 @@ export function useWhisperStream() {
     isActiveRef.current = false
 
     for (const node of inputNodesRef.current) {
-      try { node.disconnect() } catch {}
+      try {
+        node.disconnect()
+      } catch {}
     }
-    try { gainNodeRef.current?.disconnect() } catch {}
-    try { workletNodeRef.current?.disconnect() } catch {}
-    try { await audioCtxRef.current?.close() } catch {}
-    try { await recordingCtxRef.current?.close() } catch {}
-    displayStreamRef.current?.getTracks().forEach(t => t.stop())
-    micStreamRef.current?.getTracks().forEach(t => t.stop())
+    try {
+      gainNodeRef.current?.disconnect()
+    } catch {}
+    try {
+      workletNodeRef.current?.disconnect()
+    } catch {}
+    try {
+      await audioCtxRef.current?.close()
+    } catch {}
+    try {
+      await recordingCtxRef.current?.close()
+    } catch {}
+    displayStreamRef.current?.getTracks().forEach((t) => t.stop())
+    micStreamRef.current?.getTracks().forEach((t) => t.stop())
 
     socketRef.current = null
     audioCtxRef.current = null
@@ -196,7 +206,8 @@ export function useWhisperStream() {
         },
         onFull: async (msg) => {
           if (msg.message === 'auth_ok') {
-            const serverId = (msg as any).meeting_id ?? (msg as any).meetingId ?? null
+            const serverId =
+              (msg as any).meeting_id ?? (msg as any).meetingId ?? null
             if (serverId) {
               meetingIdRef.current = serverId
               setMeetingId(serverId)
@@ -204,7 +215,9 @@ export function useWhisperStream() {
             await beginAudio()
             return
           }
-          const results: SpeechmaticsResult[] = Array.isArray(msg.results) ? msg.results : []
+          const results: SpeechmaticsResult[] = Array.isArray(msg.results)
+            ? msg.results
+            : []
           const fallbackText = msg.metadata?.transcript?.trim() || ''
           const text = buildTranscriptFromResults(results) || fallbackText
           if (!text) return
@@ -215,7 +228,10 @@ export function useWhisperStream() {
             sentenceStartRef.current = startTime
           }
           if (speaker) sentenceSpeakerRef.current = speaker
-          sentenceBufferRef.current = mergeChunk(sentenceBufferRef.current, text)
+          sentenceBufferRef.current = mergeChunk(
+            sentenceBufferRef.current,
+            text,
+          )
           setLiveText(sentenceBufferRef.current.trim())
           setLiveSpeaker(sentenceSpeakerRef.current)
           if (/[.!?]\s*$/.test(sentenceBufferRef.current.trim())) {
@@ -235,15 +251,16 @@ export function useWhisperStream() {
         let displayStream: MediaStream | null = null
         let micStream: MediaStream
         try {
-          ;({ displayStream, micStream } = await getAudioStreams(selectedSource))
+          ;({ displayStream, micStream } =
+            await getAudioStreams(selectedSource))
         } catch (err) {
           console.warn('Audio permission/device error:', err)
           stop()
           return
         }
         if (!isActiveRef.current) {
-          displayStream?.getTracks().forEach(t => t.stop())
-          micStream.getTracks().forEach(t => t.stop())
+          displayStream?.getTracks().forEach((t) => t.stop())
+          micStream.getTracks().forEach((t) => t.stop())
           return
         }
         displayStreamRef.current = displayStream
@@ -251,7 +268,9 @@ export function useWhisperStream() {
 
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
-        const blob = new Blob([VOW_PROCESSOR_CODE], { type: 'application/javascript' })
+        const blob = new Blob([VOW_PROCESSOR_CODE], {
+          type: 'application/javascript',
+        })
         const url = URL.createObjectURL(blob)
         await audioCtx.audioWorklet.addModule(url)
         URL.revokeObjectURL(url)
@@ -282,13 +301,16 @@ export function useWhisperStream() {
         const recMicSource = recordingCtx.createMediaStreamSource(micStream)
         recMicSource.connect(recordingDest)
         if (displayStream && displayStream.getAudioTracks().length > 0) {
-          const recDisplaySource = recordingCtx.createMediaStreamSource(displayStream)
+          const recDisplaySource =
+            recordingCtx.createMediaStreamSource(displayStream)
           recDisplaySource.connect(recordingDest)
         }
         const finalTracks: MediaStreamTrack[] = []
-        recordingDest.stream.getAudioTracks().forEach(t => finalTracks.push(t))
+        recordingDest.stream
+          .getAudioTracks()
+          .forEach((t) => finalTracks.push(t))
         if (displayStream) {
-          displayStream.getVideoTracks().forEach(t => finalTracks.push(t))
+          displayStream.getVideoTracks().forEach((t) => finalTracks.push(t))
         }
         recordingStreamRef.current = new MediaStream(finalTracks)
         setActive(true)

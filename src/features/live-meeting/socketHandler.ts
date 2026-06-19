@@ -1,12 +1,7 @@
 // Socket handling utilities for Whisper streaming
 
-import type {
-  SpeechmaticsResult,
-} from './types'
-import {
-  buildTranscriptFromResults,
-  dominantSpeaker,
-} from './whisperHelpers'
+import type { SpeechmaticsResult } from './types'
+import { buildTranscriptFromResults, dominantSpeaker } from './whisperHelpers'
 
 // ---------- Callback signatures ----------
 export type OnPartial = (preview: string, speaker: string | null) => void
@@ -53,7 +48,10 @@ export const createWhisperSocket = (
         const results: SpeechmaticsResult[] = Array.isArray(data.results)
           ? data.results
           : []
-        const text = buildTranscriptFromResults(results) || data?.metadata?.transcript?.trim() || ''
+        const text =
+          buildTranscriptFromResults(results) ||
+          data?.metadata?.transcript?.trim() ||
+          ''
         const speaker = dominantSpeaker(results)
         callbacks.onPartial(text, speaker)
         return
